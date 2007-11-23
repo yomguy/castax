@@ -1,0 +1,1035 @@
+************************************************************************
+* NOM         : castax_main.dgibi
+* DESCRIPTION : Simulation du comportement mécanique d'un fluide en régime
+*               instationnaire forcé au sein d'un conduit axisymétrique
+*               débouchant.
+*               Modèle Navier-Stokes Transitoire - Schema implicite.
+*               Application à l'étude et dimensionnement des tuyères
+*               acoustiques.
+*
+* LANGAGE     : GIBIANE-CAST3M
+*
+* AUTEUR      : Guillaume PELLERIN (UPMC/LAM)
+*               <pellerin at ccr.jussieu.fr>
+*
+* CONTRIBUTEURS: Stéphane GOUNAND (CEA/DEN/DM2S/SFME/LTMF)
+*                <gounand at semt2.smts.cea.fr>
+*                Nicolas QUAEGEBEUR (ENSTA)
+*                <nicoq at aol.com>
+*                Pierre-Yves LAGREE (UPMC/LMM)
+*                <pyl at lmm.jussieu.fr>
+*		Frederic DABBENE (CEA/SAC/DM2S/SFME/LTMF)
+*		<ttmf3 at semt2.smts.cea.fr>
+*
+* Ce fichier fait partie du logiciel Castax
+*
+* Copyright 2005 (C) by Guillaume Pellerin <pellerin@ccr.jussieu.fr>
+*
+* Ce logiciel est régi par la licence CeCILL soumise au droit français et
+* respectant les principes de diffusion des logiciels libres. Vous pouvez
+* utiliser, modifier et/ou redistribuer ce programme sous les conditions
+* de la licence CeCILL telle que diffusée par le CEA, le CNRS et l'INRIA 
+* sur le site "http://www.cecill.info".
+* 
+* En contrepartie de l'accessibilité au code source et des droits de copie,
+* de modification et de redistribution accordés par cette licence, il n'est
+* offert aux utilisateurs qu'une garantie limitée. Pour les mêmes raisons,
+* seule une responsabilité restreinte pèse sur l'auteur du programme, le
+* titulaire des droits patrimoniaux et les concédants successifs.
+* 
+* A cet égard l'attention de l'utilisateur est attirée sur les risques
+* associés au chargement, à l'utilisation, à la modification et/ou au
+* développement et à la reproduction du logiciel par l'utilisateur étant 
+* donné sa spécificité de logiciel libre, qui peut le rendre complexe à 
+* manipuler et qui le réserve donc à des développeurs et des professionnels
+* avertis possédant des connaissances informatiques approfondies. Les
+* utilisateurs sont donc invités à charger et tester l'adéquation du
+* logiciel à leurs besoins dans des conditions permettant d'assurer la
+* sécurité de leurs systèmes et ou de leurs données et, plus généralement, 
+* à l'utiliser et l'exploiter dans les mêmes conditions de sécurité. 
+* 
+* Le fait que vous puissiez accéder à cet en-tête signifie que vous avez 
+* pris connaissance de la licence CeCILL, et que vous en avez accepté les
+* termes.
+*
+***********************************************************************
+* VERSION    : 0.4.2  01/04/2005  G. Pellerin
+*                scripts de restitution, TRAX, HOWE, debugging,
+*                structure revisitée
+* HISTORIQUE : 0.4.1  15/11/2004  G. Pellerin
+*               export des courbes temporelles, création des scripts
+*               d'execution, backups, adaptation de pstompg 
+*            : 0.4.0  01/11/2004  G. Pellerin, S. Gounand
+*               réfection entiere de l'alogorithme itératif
+*               ajout et modification des prodedures GOON
+*               (XPLOVPR, TRCHPO, etc...), creation de RENP, XPORTPS
+*            : 0.3  25/10/2003  G. Pellerin
+*               debugging, paramétrisation
+*            : 0.2  20/06/2003  N. Quaegebeur, G. Pellerin
+*               introduction de l'instationnarité DFDT,
+*                algorithme itératif, export des courbes
+*                procédure VLIM 
+*            : 0.1  12/2002  Pierre-Yves Lagrée, G. Pellerin
+*               NS stationnaire sur plan 2D infini
+*               adaptation pour axisymétrie
+*
+************************************************************************
+* PARAMETRAGE : ./castax3m, bin/castax, dgibi/castax_main.dgibi
+* EXECUTER : castax $1 $2 $3 $4 $5 $6 ou castax3m préalablement édité
+*
+*   $1 is the maximum velocity value desired at the input of the duct
+*   $2 is the frequency of the input sinusoid velocity
+*   $3 is the text file containing the 2D profile of the duct
+*   $4 is the directory path for backuping (/*.tgz + restit)
+*   $5 is the directory path for results (res/ is default)
+*   $6 is the video exporting option (type "videos" to export) (optional)
+*
+* PROCEDURES EXTERNES : proc/
+* GEOMETRIES : geo/
+* BINAIRES :   bin/
+*
+* RESULTATS : $5/$3/$2/$1/data.sauv
+*             $5/$3/$2/$1/output.txt
+*             $5/$3/$2/$1/txt/*.txt
+*             $5/$3/$2/$1/ps/*.ps
+*
+* Dans le cas d'une évolution harmonique de la vitesses d'entrée,
+* les scripts de lancement /bin/castax ou bin/castax3m génère les fichiers
+* UMAX.dgibi, FREQ.dgibi et PROFIL.dgibi contenant respectivement
+* la vitesse maximum, la fréquence fondamentale et le nom du fichier
+* définissant le profil du conduit (fichier texte (séparateur espace entre 
+* chaque coordonnée et retour chariot entre chaque point) dans geo/ )
+*
+***********************************************************************
+* Prière de PRENDRE LE TEMPS de compléter les commentaires
+* en cas de modification de ce sous-programme afin de faciliter
+* la maintenance !
+***********************************************************************
+*
+**********************************************
+**********************************************
+** PARAMETRAGE
+**********************************************
+**********************************************
+*
+********************
+* Interaction
+*
+* niveau de bavardage 
+'OPTION' ECHO 1;
+*
+* Mode intercatif (trace a chaque pas et mode XPLORVPR) ?
+interact = FAUX;
+*
+* Résolution de calcul
+* BASSE / MOYENNE / HAUTE
+* Voir le paragraphe "Numerique" ci-dessous
+f_res = 'MOYENNE';
+*
+* Modes graphiques et spatials
+*
+'OPTION' 'DIME' 2 'ELEM' QUA8 'MODE' 'AXIS' ;
+*
+'SI' ('NON' interact) ;
+  'OPTION' 'TRAC' 'PS' ;
+'SINON' ;
+  'OPTION' 'TRAC' 'X' ;
+'FINSI' ;
+'OPTION' 'ISOV' 'SULI' ;
+*
+* Echelle fixe pour les graphiques ?
+echelfix = VRAI; 
+*
+**********************************************
+* Algorithmique 
+*
+*  nitnlin : nombre d'iterations internes
+*            il serait bon qu'il ne soit pas trop
+*            petit (erresur relative < 1.D-2 dans les affichages
+*            de EXEC)
+*            sinon on ne résoud pas la non-linéarité.
+*  omeg    : facteur de relaxation (0.<  <1.) pour la non-linearite
+*            je n'ai pas eu besoin de le tripoter
+*  dcent   : décentrement 'CENTREE', 'SUPG' ou 'SUPGDC' 
+*  npdtper : nombre de pas de temps par période
+*  nper    : nombre de périodes
+*  tos     : condition de pression en sortie
+*
+discv   =  'QUAF' ;
+discp   = 'CENTREP1' ;
+dcent = 'SUPGDC' ;
+*
+* Choix de la résolution de calcul
+*
+'SI' ('EGA' f_res 'HAUTE');
+   nitnlin =  5;
+   npdtper = 36;
+   nper = 2;
+'FINSI' ;
+'SI' ('EGA' f_res 'MOYENNE');
+   nitnlin =  5;
+   npdtper = 36;
+   nper = 2 ;
+'FINSI';
+'SI' ('EGA' f_res 'BASSE');
+   nitnlin =  1;
+   npdtper = 18;
+   nper = 1 ;
+'FINSI' ;
+*
+pdt = '/' 1.D0 ('*' freq npdtper) ;
+nitma = '*' nper npdtper ;
+omeg    = 1.D0 ;
+tos = 0.0 0.0;
+* POST1   : Booleen indiquant si on affiche le résidu en NCLK
+* POST2   : Booleen indiquant si on affiche la température en NCLK
+* IRESU   : Critère d'arret sur l'incrément de pression
+POST1 = FAUX ;
+POST2 = FAUX ;
+IRESU = 5.D-2 ;
+*
+'MESSAGE' ('CHAINE' 'nitlin=' nitlin); 
+'MESSAGE' ('CHAINE' 'npdtper=' npdtper);
+'MESSAGE' ('CHAINE' 'nper=' nper);
+*
+***********************************************
+* Physique (SI)
+*
+* Excitation
+* Umax defini par l'option $1 de fluidac3m
+* frequence par l'option $2 de fluidac3m
+*
+* freq = 55.0
+* Umax = 1.0;
+pi = 3.14159265358979;
+*
+* pulsation (en matrice) (rad/s)
+omega = '*' 2 ( * pi freq);
+*
+T = 20.0;
+T0 = 273.16;
+*temperature (K)
+T = '+' T0  T;
+* calcul de la celerite du son (m/s)
+cson = '*' 331.45 ('**' ('/' T  T0) 0.5);
+* densite de l'air (kg/m^3)
+rho = '*' 1.2929 ('/' T0 T);
+* chaleur massique à pression constante (J/(Kg.K)
+Cp = 1004;
+* coefficient de viscosite dynamique (N.s/m^2)
+mu = 1.708e-5 * ( '+' 1 ('*' 0.0029  T));
+*
+* Coefficient de viscosite cinematique
+*rho = 1.276 ;
+*mu = 2.D-5 ;
+nu = '/' mu rho ;
+* longueur caratéristique de la couche limite
+* dans l'intervalle [1.D-4;5.D-3] m
+coulm = 0.002;
+*
+* Affichages
+'MESSAGE' ('CHAINE' 'T=' T ',rho=' rho ',nu=' nu); 
+*
+******************************************
+* Résolutions géométriques
+*
+* Profil
+dirgeo = '';
+* nom du profil défini dans l'argument $3 du script castax
+nfic = profil;
+* sinon, le définir...
+* nfic = 'toto.geo';
+*
+* Domaine (tube) à l'entrée ?
+* (dans ce cas c'est la surface d'entrée du conduit qui fait office
+* d'oscillateur, attention au débit !...)
+cond_int = FAUX;
+* Domaine à la sortie ?
+cond_ext = VRAI;
+*
+* longueur du domaine exterieur
+longext=0.5;
+* largeur du domaine exterieur
+largext=0.3;
+* longueur du conduit amont
+longint=0.152;
+*
+'SI' ( 'EGA' f_res 'HAUTE');
+* resolution longueur du domaine exterieur
+rlongext=30;
+* resolution largeur du domaine exterieur
+rlargext=30;
+* resolution couche limite
+rcoulm=12;
+* resolution du diametre du conduit
+rtuydia=20;
+* resolution longueur du conduit amont
+rlongint=15;
+FINSI ;
+*
+'SI' ( 'EGA' f_res 'MOYENNE');
+rlongext=30;
+rlargext=30;
+rcoulm=5;
+rtuydia=20;
+rlongint=15;
+FINSI ;
+*
+'SI' ( 'EGA' f_res 'BASSE');
+rlongext=10;
+rlargext=10;
+rcoulm=3;
+rtuydia=8;
+rlongint=15;
+'FINSI' ;
+*
+* densité pour le profil log de la couche limite
+dcoul=0.1005;
+*
+* résolution du diametre du conduit amont
+rintdia = rtuydia;
+* nombre de points de capture sur le rayon pour les trajectoires
+rrtraj = 6;
+* nombre de points de capture sur le rayon pour les trajectoires
+rztraj = 10;
+*
+************************************************
+* Fichiers E/S
+*
+IMPRPS = VRAI;
+dirps = 'ps/';
+dirtxt = 'txt/';
+*
+* A FINIR
+* signal de vitesse d'entree sinusoide ?
+sig_sin = vrai;
+*
+* ou fichier temporel (.txt)
+'SI' ('NON' sig_sin);
+   sig_v_fic = 'sigv01.txt';
+   sig_t = 'TABLE' ;
+   sig_v = 'TABLE' ;
+   nt = 'TABLE' ;
+   sig_t sig_v nt.1 = jelis sig_v_fic;   
+'FINSI' ;
+* FIN A FINIR
+*
+* Postscript du maillage
+ficoutm = 'CHAINE'  dirps 'mail_' profil '.ps';
+*
+* Postscript des pressions
+ficoutp = 'CHAINE' dirps 'p_' profil '_' (formar umax 2)
+                    '_' (formar freq 2) '.ps';
+* Postscript des vecteurs vitesses
+ficoutvv =  'CHAINE' dirps 'vv_' profil '_' (formar umax 2)
+                      '_' (formar freq 2) '.ps';
+* Postscript des vitesses selon ux
+ficoutvx =  'CHAINE' dirps 'vx_' profil '_' (formar umax 2)
+                         '_' (formar freq 2) '.ps';
+* Postscript des vitesses selon uy
+ficoutvy =  'CHAINE' dirps 'vy_' profil '_' (formar umax 2)
+                            '_' (formar freq 2) '.ps';
+* Postscript des rotationnels
+ficoutr =  'CHAINE' dirps 'r_' profil '_' (formar umax 2)
+                            '_' (formar freq 2) '.ps';
+* Postscript des fonctions de courant
+ficoutc =  'CHAINE' dirps 'c_' profil '_' (formar umax 2)
+                            '_' (formar freq 2) '.ps';
+* Postscript des trajectoires
+ficoutt =  'CHAINE' dirps 'tr_' profil '_' (formar umax 2)
+                            '_' (formar freq 2) '.ps';
+* Postscript des sources de bruits (vectoriel)
+ficouthv =  'CHAINE' dirps 'hv_' profil '_' (formar umax 2)
+                            '_' (formar freq 2) '.ps';
+* Postscript des sources de bruits selon UX
+ficouthx =  'CHAINE' dirps 'hx_' profil '_' (formar umax 2)
+                            '_' (formar freq 2) '.ps';
+* Postscript des sources de bruits selon UY
+ficouthy =  'CHAINE' dirps 'hy_' profil '_' (formar umax 2)
+                            '_' (formar freq 2) '.ps';
+* Titre de l'essai
+titglob = 'CHAINE' profil'_u='(formar umax 2)'_f='(formar freq 2);
+*
+*
+************************
+************************
+** MAILLAGE
+************************
+************************
+* (module en grande partie écrit par Nicolas Quaegebeur)
+*
+**********************************
+* Lecture du fichier externe
+*
+* On compte le nombre de points
+comptn = CHAINE 'wc -l ' nfic;
+*comptn = chaine '$CASTAX/bin/comptprofil.sh ' profil;
+*
+np = 'EXTE' comptn;
+npn = np.1;
+*
+* Si la procédure JELIS2D ne fonctionne pas...
+*
+*'OPTION' acqu nfic;
+*'REPETER' bloc3 npn;
+*  j = &bloc3;
+*  acqu a o;
+* en mm
+*  FINSI;
+*  abs_i.j = a*0.001 ;
+*  ord_i.j = o*0.001 ;
+*'FIN' bloc3;
+*
+abs_i ord_i = JELIS2D nfic npn;
+* (voir proc/ES.dgibi)
+*
+SI (NON (EXIS abs_i 1));
+ abs_i.1 = abs_i.0;
+ ord_i.1 = ord_i.0;
+FINSI;
+*
+* Conversion mm -> m
+repe bloc4 npn;
+j=&bloc4;
+abs_i.j=0.001*abs_i.j;
+ord_i.j=0.001*ord_i.j;
+fin bloc4;
+*
+absi=abs_i;
+ord=ord_i;
+*
+*opti donn 5;
+*
+**********************************
+* Segmentation de la paroi (wall)
+*
+n = npn;
+j=2;
+p1 = absi.1 (ord.1);
+p11= absi.1 (ord.1 '-' coulm);
+p2 = absi.2 (ord.2);
+p21 = absi.2 (ord.2 '-' coulm);
+wallt = 'DROIT' 1 p1 p2;
+wall1 = 'DROIT' 1 p11 p21;
+*
+'REPETER'  bloc4 ('-' n 2);
+p2 = absi.j (ord.j);
+p21 = absi.j (ord.j '-' coulm);
+p3 = absi.(j+1) (ord.(j+1));
+p31 = absi.(j+1) (ord.(j+1) '-' coulm);
+seg = 'DROIT'  1 p2 p3;
+seg1 = 'DROIT'  1 p21 p31;
+wallt = wallt 'ET'  seg;
+wall1= wall1 'ET' seg1;
+j = j + 1;
+'FIN'  bloc4;
+*
+o1 = 0.0 0.0;
+i1 = 1.0 0.0;
+wallt = wallt 'SYMETRIE'  droit o1 i1;
+wall1 = wall1 'SYMETRIE'  droit o1 i1;
+'ELIMINATION'  0.0000001 wallt ;
+'ELIMINATION'  0.0000001 wall1 ;
+*
+*/ definition de la couche limite
+wallt = wallt 'TOURNER'  90 o1;
+wall1 = wall1 'TOURNER'  90 o1;
+*
+V=0.0 -0.001;
+CouLim=wallt 'REGLER' (-1*rcoulm) wall1 dini 0.1 dfin dcoul;
+*
+******************************
+* Segmentation de l'axe (haut)
+*
+j=2;
+p1 = absi.1 0.;
+p2 = absi.2 0.;
+haut = 'DROIT' 1 p1 p2;
+*
+'REPETER'  bloc4 (n-2);
+p2 = absi.j 0.;
+p3 = absi.(j+1) 0.;
+seg = 'DROIT' 1 p2 p3;
+haut=haut 'ET'  seg;
+j = j + 1;
+'FIN'  bloc4;
+*
+o1 = 0.0 0.0;
+i1 = 1.0 0.0;
+haut = haut 'SYMETRIE'  'DROIT'  o1 i1;
+*
+******************************************
+* Segmentation de l'entree, du col et de la sortie 
+*
+p_s1 = absi.1 ord.1;
+p_i2 = absi.n (-1*ord.n);
+p_i21 = absi.n (-1*ord.n '+' coulm);
+p_s2 = absi.n 0.0;
+p_s3 = absi.1 0.0;
+p_i3 = absi.1 (-1*ord.(1));
+*
+haut = haut 'TOURNER'  90 o1;
+*
+p_s1=p_s1 'TOURNER' 90 o1;
+p_i2=p_i2 'TOURNER' 90 o1;
+p_s2=p_s2 'TOURNER' 90 o1;
+p_i3=p_i3 'TOURNER' 90 o1;
+p_s3=p_s3 'TOURNER' 90 o1;
+*
+mgeo = haut 'REGLER' rtuydia wall1;
+mgeo=mgeo 'ET' coulim;
+*
+* Definition de la sortie
+sortie='FACE' 2 mgeo;
+* Definition de l'entree
+entree='FACE' 4 mgeo;
+*
+* Définition de la section au col
+nc = '/' n 2;
+col = 'DROIT' rtuydia (0.0 absi.nc) (('-' ord.nc coulm) absi.nc);
+cou_col = 'DROIT' rcoulm (('-' ord.nc coulm) absi.nc) (ord.nc absi.nc)
+         dini 0.1 dfin dcoul;
+col = 'ET' col cou_col;
+'ELIMINATION' 0.000000001 col;
+*
+******************************
+* Volume axi placé en amont du conduit (interne)
+*
+p0=absi.1 0.0;
+p1=absi.1 (-1.0*ord.1);
+p10=absi.1 (-1.0*ord.1+coulm);
+p2=(absi.1-longint) (-1.0*ord.1);
+p23=(absi.1-longint) (-1.0*ord.1+coulm);
+p3=(absi.1-longint) 0.0;
+*
+t1='DROIT' rlongint p3 p0;
+t2='DROIT' rlongint p23 p10;
+t3='DROIT' rlongint p2 p1;
+*
+t1=t1 'TOURNER' 90 o1;
+t2=t2 'TOURNER' 90 o1;
+t3=t3 'TOURNER' 90 o1;
+*
+tin_t = t1 'REGLER' rintdia t2;
+tin_c = t3 'REGLER' (-1*rcoulm) t2 dini 0.1 dfin dcoul;
+*
+tube1 = tin_t 'ET' tin_c;
+*
+'ELIMINATION'  0.0000001 tube1;
+'ORIENTER' tube1;
+'SI' (EGA cond_int VRAI);
+* Definition de l'entree
+entree='FACE' 4 tube1;
+'FINSI' ;
+*
+**********************************************
+* Volume axi placé après le conduit (domaine exterieur)
+*
+p1=absi.n 0.0;
+p2=absi.n+longext 0.0;
+p6=absi.n+longext (-1.0*ord.n '+' coulm);
+p5=absi.n (-1.0*ord.n '+' coulm);
+*
+p1=p1 'TOURNER' 90 o1;
+p2=p2 'TOURNER' 90 o1;
+p6=p6 'TOURNER' 90 o1;
+p5=p5 'TOURNER' 90 o1;
+*
+p1p2='DROIT' (-1*rlongext) p1 p2 dini 0.1 dfin 0.12;
+p5p6='DROIT' (-1*rlongext) p5 p6 dini 0.1 dfin 0.12;
+p1p5='DROIT' rtuydia p1 p5;
+p2p6='DROIT' rtuydia p2 p6;
+*
+l_ext1=p1p2 'ET' p2p6 'ET' p5p6 'ET' p1p5;
+ext1='DALLER' p1p2 p2p6 p5p6 p1p5;
+*ext1='SURFACE' l_ext1;
+*'TRACER' ext1;
+*
+p7=absi.n+longext (-1.0*ord.n);
+p8=absi.n (-1.0*ord.n);
+p9=absi.(n-1);
+*
+p7=p7 'TOURNER' 90 o1;
+p8=p8 'TOURNER' 90 o1;
+*
+p5p6='DROIT' (-1*rlongext) p5 p6 dini 0.1 dfin 0.12;
+p8p7='DROIT' (-1*rlongext) p8 p7 dini 0.1 dfin 0.12;
+p6p7='DROIT' (-1*rcoulm) p7 p6 dini 0.1 dfin dcoul;
+p5p8='DROIT' (-1*rcoulm) p8 p5 dini 0.1 dfin dcoul;
+*
+l_ext2=p5p6 'ET' p6p7 'ET' p8p7'ET' p5p8;
+ext2='DALLER' p5p6 p6p7 p8p7 p5p8;
+*ext2='SURFACE' l_ext2;
+*'TRACER' ext2;
+*
+p3=absi.n+longext (-1*largext);
+p4=absi.n (-1*largext);
+*
+p3=p3 'TOURNER' 90 o1;
+p4=p4 'TOURNER' 90 o1;
+*
+p8p7='DROIT' (-1*rlongext) p8 p7 dini 0.1 dfin 0.12;
+p4p3='DROIT' (-1*rlongext) p4 p3 dini 0.1 dfin 0.12;
+p7p3='DROIT' (-1*rlargext) p7 p3 dini 0.1 dfin 0.11;
+p8p4='DROIT' (-1*rlargext) p8 p4 dini 0.1 dfin 0.11;
+*
+l_ext3=p8p7 'ET' p7p3 'ET' p4p3 'ET' p8p4;
+ext3='DALLER' p8p7 p7p3 p4p3 p8p4;
+*ext3='SURFACE' l_ext3;
+*'TRACER' ext3;
+*
+ext=ext1 'ET' ext2 'ET' ext3;
+'ELIMINATION' 0.00000001 ext;
+*
+**********************
+* Somme des maillages
+*
+wall=wallt 'ET' p8p4;
+'SI' (EGA cond_int VRAI);
+wall=wall 'ET' t3;
+'FINSI' ;
+*trace wall;
+haut=haut 'ET' p1p2;
+*trace haut;
+ext_lim = p2p6 'ET' p6p7 'ET' p7p3 'ET' p4p3;
+*trace ext_lim
+*
+SI (EGA cond_int VRAI);
+mgeo=mgeo 'ET' tube1;
+FINSI;
+*
+SI (EGA cond_ext VRAI);
+mgeo=mgeo 'ET' ext;
+FINSI;
+*
+* suppression du point appartenant a la paroi pour l'entree
+ent = entree;
+SI (EGA cond_int VRAI);
+p99=ord.1 (-1*longint);
+'SINON' ;
+p99=ord.1 0.0;
+'FINSI' ;
+p98 = entree 'POIN' 'PROC' p99;
+entmp1 = 'DIFF' ('CHANGER' ent 'POI1')
+                ('MANUEL' 'POI1' p98);
+*
+'ELIMINATION'  0.00000001 mgeo;
+'ORIENTER' mgeo;
+cgeo = 'CONTOUR' mgeo;
+*
+* Sorties graphiques
+sor = sortie;
+axe = haut ;
+mt = mgeo;
+fix = wall;
+'SI' interact;
+  'TRACER' ('ET' mt cgeo);
+'FINSI';
+*
+*'OPTION' donn 5;
+*
+***********************************
+* export du maillage en postscript 
+'OPTION' TRAC ps;
+'OPTION' FTRA ficoutm;
+'TRACER' mt;
+'OPTION' TRAC X;
+*
+*************************
+* FIN MAILLAGE
+*************************
+*************************
+* CAPTEURS
+*************************
+*************************
+n=npn;
+ncapt=9;
+indcapt = 'ENTIER' ('/' n ncapt);
+*indcapt= ENT  (npn/(ncapt+1));
+*
+* micro axial en entree
+i=1;
+mic00 = (absi.i) (-0.008);
+mic00= mic00 tour 90 o1;
+mic00 = mgeo POIN PROC mic00;
+* micro radial 01
+i=indcapt;
+mic01 = (absi.i) (-1*ord.i);
+mic01 = mic01 'TOURNER'  90 o1;
+mic01 = mgeo POIN PROC mic01;
+* micro radial 03
+i=3*indcapt;
+mic03 = (absi.i) (-1*ord.i);
+mic03 = mic03 'TOURNER'  90 o1;
+mic03 = mgeo POIN PROC mic03;
+* au col
+i=5*indcapt;
+mic05 = (absi.i) (-1*ord.i);
+mic05= mic05 'TOURNER'  90 o1;
+mic05 = mgeo POIN PROC mic05;
+* micro radial 07
+i=7*indcapt;
+mic07 = (absi.i) (-1*ord.i);
+mic07 = mic07 'TOURNER'  90 o1;
+mic07 = mgeo POIN PROC mic07;
+*
+* micro axial en sortie
+mic10 = (absi.n) (-0.008);
+mic10= mic10 tour 90 o1;
+mic10 = mgeo POIN PROC mic10;
+* micro axial 5 cm de la sortie
+mic11 = (absi.n+0.125) (-0.008);
+mic11= mic11 'TOURNER'  90 o1;
+mic11 = mgeo POIN PROC mic11;
+* micro en dehors du jet
+mic12 = (absi.n+0.125) (-1.0*ord.n);
+mic12= mic12 'TOURNER'  90 o1;
+mic12 = mgeo POIN PROC mic12;
+*
+*************************************
+* Initialisation des tables de capteurs
+* (chaque sous-table contient autant de vecteurs que d'itérations de calcul)
+*
+* paxe : pression le long de l'axe (Pa)
+* vaxe : vitesse le long de l'axe (m/s)
+* iaxe : intensité le long de l'axe
+* p_ent : pression sur le rayon à l'entrée
+* v_ent : vitesse sur le rayon à l'entrée
+* p_sor : pression sur le rayon à la sortie
+* v_sor : vitesse sur le rayon à la sortie
+* p_col : pression sur le rayon au col
+* v_col : vitesse sur le rayon au col
+* tpar : pression sur la paroi
+* tpar : frottement le long de la paroi
+* time : vecteur temporel (s)
+
+capt_nom = 'TABLE' ;
+capt_nom.1='residus';
+capt_nom.2='pp00' ;
+capt_nom.3='pp01' ;
+capt_nom.4='pp03' ;
+capt_nom.5='pp05' ;
+capt_nom.6='pp07' ;
+capt_nom.7='pp10' ;
+capt_nom.8='pp11' ;
+capt_nom.9='pp12' ;
+capt_nom.10='vp00' ;
+capt_nom.11='vp10' ;
+capt_nom.12='vp11' ;
+capt_nom.13='vp12';
+capt_nom.14='ze' ;
+capt_nom.15='zray' ;
+capt_nom.16='paxe' ;
+capt_nom.17='vaxe'  ;
+capt_nom.18='iaxe' ;
+capt_nom.19='tpar'  ;
+capt_nom.20='ppar'  ;
+capt_nom.21='p_ent';
+capt_nom.22='v_ent' ;
+capt_nom.23='p_sor' ;
+capt_nom.24='v_sor' ;
+capt_nom.25='p_col' ;
+capt_nom.26='v_col' ;
+capt_nom.27='time' ;
+*
+ncapt=27;
+*
+capt = 'TABLE' 'RESULTATS' ;
+'REPETER' iicapt ncapt;
+cnt=capt_nom.&iicapt;
+capt.cnt = 'TABLE' ;
+capt.cnt.0 = 0;
+'FIN' iicapt;
+*
+************************************
+************************************
+** CALCUL
+************************************
+************************************
+*
+_mt = 'CHANGER' mt 'QUAF' ;
+_entree = 'CHANGER' sortie 'QUAF';
+_sortie = 'CHANGER' sortie 'QUAF';
+_cgeo = 'CHANGER' cgeo 'QUAF' ;
+_fix = 'CHANGER' fix 'QUAF' ;
+$mt = 'MODELISER' _mt 'NAVIER_STOKES' discv ;
+$entree = 'MODELISER' _entree 'NAVIER_STOKES' discv ;
+$sortie = 'MODELISER' _sortie 'NAVIER_STOKES' discv ;
+$cgeo = 'MODELISER' _cgeo 'NAVIER_STOKES' discv ;
+$fix = 'MODELISER' _fix 'NAVIER_STOKES' discv;
+*
+*
+***************************
+* Construction du schéma NS instationnaire
+*
+rv = 'EQEX' $mt 'NITER' nitnlin 'ITMA' 1 'OMEGA' omeg
+   'OPTI' 'EF' 'IMPL' dcent discp
+   'ZONE' $mt 'OPER' RESIDU 1 IRESU
+   'ZONE' $mt 'OPER' 'NS' nu 'INCO' 'UN'
+   'OPTI' 'EF' 'IMPL' dcent discp
+   'ZONE' $mt 'OPER' 'KBBT' (1.0 '/' rho) (-1.0) 'INCO' 'UN' 'PN'
+   'ZONE' $sortie 'OPER' 'TOIM' tos 'INCO' 'UN'
+   'OPTI' 'EF' 'IMPL' dcent discp
+   'ZONE' $mt 'OPER' 'DFDT' 1. 'UN' pdt 'UN' 0.8 'INCO' 'UN';
+*
+*
+*******************************
+* Conditions aux limites
+*
+muxnul = 'ET' ('ET' wall ent) axe;
+muynul =  wall ;
+*
+rv = 'EQEX' rv 'CLIM'
+          'UN' 'UIMP' muxnul 0. 
+          'UN' 'VIMP' muynul 0. ;
+*
+**********************
+* Inconnues physiques
+*
+rv . 'INCO' = 'TABLE' 'INCO' ;
+rv . 'INCO' . 'UN'  = 'KCHT' $mt 'VECT' 'SOMMET' (0. 0.) ;
+rv . 'INCO' . 'PN'  = 'KCHT' $mt 'SCAL' discp 0. ;
+*
+************************
+* Inconnues pour RESIDU
+*
+rv . 'INCO' . 'UN2'  = 'COPI' rv . 'INCO' . 'UN' ;
+rv . 'INCO' . 'PN2'  = 'COPI' rv . 'INCO' . 'PN' ;
+rv . 'INCO' . 'IT'   = 'PROG' ;
+rv . 'INCO' . 'TI'   = 'PROG' ;
+rv . 'INCO' . 'ER'   = 'PROG' ;
+*
+*****************************
+* Initialisation des tables de resultats
+*
+t = 0.0 ;
+itcou = 0 ;
+res = 'TABLE' 'RESULTATS' ;
+res . 'TIME' = 'TABLE' ;
+res . 'PRESSIONS' = 'TABLE' ;
+res . 'VITESSES' = 'TABLE' ;
+res . 'ROTATIONNELS' = 'TABLE' ;
+res . 'COURANT' = 'TABLE' ;
+res . 'TRAJECTOIRES' = 'TABLE' ;
+res . 'HOWE' = 'TABLE';
+res . 'TIME' . itcou = t ;
+*opti donn 5;
+vit pre rt cou rez = VPRCOU rv;
+res . 'PRESSIONS' . itcou = pre ;
+res . 'VITESSES' . itcou = vit ;
+res . 'ROTATIONNELS' . itcou = rt ;
+res . 'COURANT' .itcou = cou ;
+v_tra = res.VITESSES;
+tra = TRAX v_tra rrtraj rtuydia rztraj npn pdt;
+res . 'TRAJECTOIRES'.itcou = tra ;
+how = HOWE vit $mt;
+res . 'HOWE'.itcou = how ;
+*
+********************
+* Boucle en temps
+*
+'MESSAGE'  'temps courant = ' t ' s';
+*
+'REPETER' iitma nitma;
+*
+   t = '+' t pdt ;
+   itcou = '+' itcou 1 ;
+   'MESSAGE' 'geo : ' profil ;
+   'MESSAGE' 'freq = ' freq ' Hz'; 
+   'MESSAGE' 'u_max = ' umax ' m/s';
+   'MESSAGE' 't = ' t ' s';
+   'MESSAGE' 'pas' itcou '/' nitma;
+*
+* Conditions aux limites a l'entree a l'instant t
+* (todo: sig_v externe)
+   VLIM rv t;
+* Execution
+   EXEC RV;
+* Sauvegarde des champs
+   vit pre rt cou rez = VPRCOU rv ;
+   res . 'PRESSIONS' . itcou = pre ;
+   res . 'VITESSES' . itcou = vit ;
+   res . 'ROTATIONNELS' . itcou = rt ;
+   res . 'COURANT' .itcou = cou ;
+   v_tra = res.VITESSES;
+   tra = TRAX v_tra rrtraj rtuydia rztraj npn pdt;
+   res . 'TRAJECTOIRES'.itcou = tra ;
+   how = HOWE vit $mt;
+   res . 'HOWE'.itcou = how ;
+   res . 'TIME' . itcou = t ;
+* Calcul des evolutions
+pr00 pr01 pr03 pr05 pr07 pr10 pr11 pr12 vr00 vr10 vr11
+vr12 zray ze preaxe vitaxe intaxe taupar prepar p_ent
+v_ent p_sor v_sor p_col v_col = RENP res itcou;
+* Sauvegarde des evolutions
+   capt.'pp00'.itcou = pr00;
+   capt.'pp01'.itcou = pr01;
+   capt.'pp03'.itcou = pr03;
+   capt.'pp05'.itcou = pr05;
+   capt.'pp07'.itcou = pr07;
+   capt.'pp10'.itcou = pr10;
+   capt.'pp11'.itcou = pr11;
+   capt.'pp12'.itcou = pr12;
+   capt.'vp00'.itcou = vr00;
+   capt.'vp10'.itcou = vr10;
+   capt.'vp11'.itcou = vr11;
+   capt.'vp12'.itcou = vr12;
+   capt.'ze'.itcou = ze;
+   capt.'zray'.itcou = zray;
+   capt.'time'.itcou = t;
+   capt.'residus'.itcou = rez ;
+   capt.'paxe'.itcou = preaxe;
+   capt.'vaxe'.itcou = vitaxe;
+   capt.'iaxe'.itcou = intaxe;
+   capt.'tpar'.itcou = taupar;
+   capt.'ppar'.itcou = prepar;
+   capt.'p_ent'.itcou = p_ent ;
+   capt.'v_ent'.itcou = v_ent ;
+   capt.'p_sor'.itcou = p_sor ;
+   capt.'v_sor'.itcou = v_sor ;
+   capt.'p_col'.itcou = p_col ;
+   capt.'v_col'.itcou = v_col ;
+   'MESSAGE' 'p00 = ' pr00 ' Pa';
+   'MESSAGE' 'v00 = ' vr00 ' m/s';
+   'MESSAGE' 'Erreur intermediaire (%) = '
+     (* 100 ('**' 10 (capt.'residus'.itcou * ('LOG' 10))));
+*
+  'SI' interact;
+     tit = 'CHAINE' 'Vitesse/Pression; t=' (formar t 3) ' s; ' titglob;
+     TRCHPO mt vit pre tit vrai ;
+  'FINSI';
+*
+'FIN' iitma ;
+*
+*
+* Fin boucle en temps
+*********************
+*
+*************************************
+*************************************
+** FIN CALCUL
+*************************************
+*
+*************************************
+* POST PROCESS
+*************************************
+*************************************
+*
+* Pressions dB (SPL)
+*
+* 00 : entree
+* 10 : sortie
+*
+pp00 = 'PROG' ;
+pp10 = 'PROG' ;
+vp00 = 'PROG' ;
+vp10 = 'PROG' ;
+'REPETER' iindic ('-' ('DIME' capt.'pp00') 1) ;
+   pp00  = 'ET' pp00 ('PROG' (capt.'pp00'.&iindic)) ;
+   pp10  = 'ET' pp10 ('PROG' (capt.'pp10'.&iindic)) ;
+   vp00  = 'ET' vp00 ('PROG' (capt.'vp00'.&iindic));
+   vp10  = 'ET' vp10 ('PROG' (capt.'vp10'.&iindic)) ;
+'FIN' iindic ;
+mp00 = 'MAXIMUM' pp00 ;
+mp10 = 'MAXIMUM' pp10 ;
+mv00 = 'MAXIMUM' vp00 ;
+mv10 = 'MAXIMUM' vp10 ;
+*
+spl00 = 20 '*' ('LOG' (mp00 '/' 2.D-5)) '/' ('LOG' 10);
+spl10 = 20 '*' ('LOG' (mp10 '/' 2.D-5)) '/' ('LOG' 10);
+svl00 = 10 '*' ('LOG' (mv00 '/' 5.D-9)) '/' ('LOG' 10);
+svl10 = 10 '*' ('LOG' (mv10 '/' 5.D-9)) '/' ('LOG' 10);
+*
+'MESSAGE' 'Pression dB (SPL) pos 00, 01 :' spl00 ', ' spl10;
+'MESSAGE' 'Vitesse  dB (SVL) pos 00, 01 :' svl00 ', ' svl10;
+*
+*
+'OUBLIER' rv ;
+fsauv = 'data.sauv' ;
+'OPTION' 'SAUV' fsauv ;
+'SAUVER' ;
+*
+* Fenetre interative ? (voir options generales du debut)
+*
+'SI' interact;
+XPLORVPR res;
+'FINSI' ;
+*
+***********************
+* Export des champs
+*
+* appel du fichier d'export
+'SI' (IMPRPS);
+* Choix du type d'echelle puis export
+   'OPTION' 'ISOV' 'SULI' ;
+   'SI' echelfix;
+   XPORTPS res 'COURANT' 'SCAL' ficoutc vrai;
+   XPORTPS res 'PRESSIONS' 'SCAL' ficoutp vrai;
+   XPORTPS res 'VITESSES' 'VECT' ficoutvv vrai;
+   XPORTPS res 'VITX' 'SCAL' ficoutvx vrai;
+   XPORTPS res 'VITY' 'SCAL' ficoutvy vrai;
+   XPORTPS res 'HOWE' 'VECT' ficouthv vrai;
+   XPORTPS res 'HOWX' 'SCAL' ficouthx vrai;
+   XPORTPS res 'HOWY' 'SCAL' ficouthy vrai;
+   'SINON';
+   XPORTPS res 'COURANT' 'SCAL' ficoutc faux;
+   XPORTPS res 'PRESSIONS' 'SCAL' ficoutp faux;
+   XPORTPS res 'VITESSES' 'VECT' ficoutvv faux;
+   XPORTPS res 'VITX' 'SCAL' ficoutvx faux;
+   XPORTPS res 'VITY' 'SCAL' ficoutvy faux;
+   XPORTPS res 'HOWE' 'VECT' ficouthv faux;
+   XPORTPS res 'HOWX' 'SCAL' ficouthx faux;
+   XPORTPS res 'HOWY' 'SCAL' ficouthy faux;
+   'FINSI' ;
+*
+   XPORTPS res 'ROTATIONNELS' 'SCAL' ficoutr faux;
+   XPORTPS res 'TRAJECTOIRES' 'TRAX' ficoutt;
+   'OPTION' 'ISOV' 'SURFACE' ;
+*
+*************************
+* Export des evolutions
+*
+XPORTPS capt 'pp00' 'EVOL';
+XPORTPS capt 'pp01' 'EVOL';
+XPORTPS capt 'pp03' 'EVOL';
+XPORTPS capt 'pp05' 'EVOL';
+XPORTPS capt 'pp07' 'EVOL';
+XPORTPS capt 'pp10' 'EVOL';
+XPORTPS capt 'pp11' 'EVOL';
+XPORTPS capt 'pp12' 'EVOL';
+XPORTPS capt 'vp00' 'EVOL';
+XPORTPS capt 'vp10' 'EVOL';
+XPORTPS capt 'vp11' 'EVOL';
+XPORTPS capt 'vp12' 'EVOL';
+XPORTPS capt 'ze' 'EVOL';
+XPORTPS capt 'zray' 'EVOL';
+XPORTPS capt 'residus' 'EVOL';
+XPORTPS capt 'paxe' 'EVOLS';
+XPORTPS capt 'vaxe' 'EVOLS';
+XPORTPS capt 'iaxe' 'EVOLS';
+XPORTPS capt 'tpar' 'EVOLS';
+XPORTPS capt 'ppar' 'EVOLS';
+XPORTPS capt 'ppar' 'EVOLS';
+XPORTPS capt 'p_ent' 'EVOLS';
+XPORTPS capt 'v_ent' 'EVOLS';
+XPORTPS capt 'p_sor' 'EVOLS';
+XPORTPS capt 'v_sor' 'EVOLS';
+XPORTPS capt 'p_col' 'EVOLS';
+XPORTPS capt 'v_col' 'EVOLS';
+*
+'FINSI';
+*
+*'OPTION' 'DONN' 5 ;
+*
+*
+*************************************
+*************************************
+* FIN DE POST PROCESS
+*************************************
+*
+****************************************
+* End of dgibi file castax_main.dgibi
+****************************************
+**************************************
+*
+'FIN';

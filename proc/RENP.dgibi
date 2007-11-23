@@ -1,0 +1,194 @@
+* ************************************************************************
+* NOM         : RENP
+* DESCRIPTION : extrait les données de pression, vitesse des tables de
+*		résultats de Castax aux capteurs préalablement définis
+*		(micXX), sur l'axe de symétrie, sur la paroi, ainsi que le
+*		frottement à la paroi
+*
+* LANGAGE     : GIBIANE-CAST3M
+*
+* AUTEUR      : Guillaume PELLERIN (UPMC/LAM)
+*               <pellerin at ccr.jussieu.fr>
+*
+* CONTRIBUTEURS: Nicolas QUAEGEBEUR (ENSTA)
+*                <nicoq at aol.com>
+*                Pierre-Yves LAGREE (UPMC/LMM)
+*                <pyl at ccr.jussieu.fr>
+*
+* Ce fichier fait partie du logiciel Castax
+*
+* Copyright 2005 (C) by Guillaume Pellerin <pellerin@ccr.jussieu.fr>
+*
+* Ce logiciel est régi par la licence CeCILL soumise au droit français et
+* respectant les principes de diffusion des logiciels libres. Vous pouvez
+* utiliser, modifier et/ou redistribuer ce programme sous les conditions
+* de la licence CeCILL telle que diffusée par le CEA, le CNRS et l'INRIA 
+* sur le site "http://www.cecill.info".
+* 
+* En contrepartie de l'accessibilité au code source et des droits de copie,
+* de modification et de redistribution accordés par cette licence, il n'est
+* offert aux utilisateurs qu'une garantie limitée. Pour les mêmes raisons,
+* seule une responsabilité restreinte pèse sur l'auteur du programme, le
+* titulaire des droits patrimoniaux et les concédants successifs.
+* 
+* A cet égard l'attention de l'utilisateur est attirée sur les risques
+* associés au chargement, à l'utilisation, à la modification et/ou au
+* développement et à la reproduction du logiciel par l'utilisateur étant 
+* donné sa spécificité de logiciel libre, qui peut le rendre complexe à 
+* manipuler et qui le réserve donc à des développeurs et des professionnels
+* avertis possédant des connaissances informatiques approfondies. Les
+* utilisateurs sont donc invités à charger et tester l'adéquation du
+* logiciel à leurs besoins dans des conditions permettant d'assurer la
+* sécurité de leurs systèmes et ou de leurs données et, plus généralement, 
+* à l'utiliser et l'exploiter dans les mêmes conditions de sécurité. 
+* 
+* Le fait que vous puissiez accéder à cet en-tête signifie que vous avez 
+* pris connaissance de la licence CeCILL, et que vous en avez accepté les
+* termes.
+*************************************************************************
+*
+'DEBPROC' RENP;
+'ARGUMENT' matab*'TABLE';
+'ARGUMENT' tabind/'ENTIER';
+*
+pn = matab.PRESSIONS.tabind;
+vn = matab.VITESSES.tabind;
+*
+********************************
+* Pression/Vitesse aux capteurs
+*
+* pression/vitesse axiales entree
+ps00 ='EXTRAIRE' pn SCAL mic00;
+vs00 = 'EXTRAIRE' vn UY mic00;
+*
+* micros radiaux
+ps01 ='EXTRAIRE'  pn SCAL mic01;
+ps03 ='EXTRAIRE'  pn SCAL mic03;
+ps05 ='EXTRAIRE'  pn SCAL mic05;
+ps07 ='EXTRAIRE'  pn SCAL mic07;
+*
+* pression/vitesse axiales en sortie
+ps10 ='EXTRAIRE'  pn SCAL mic10;
+vs10 = 'EXTRAIRE' vn UY mic10;
+*
+* pression/vitesse axiales 5 cm de la sortie
+ps11 ='EXTRAIRE'  pn SCAL mic11;
+vs11 ='EXTRAIRE' vn UY mic11;
+*
+* pression/vitesse axiales en dehors du jet
+ps12 ='EXTRAIRE'  pn SCAL mic12;
+vs12 ='EXTRAIRE' vn UY mic12;
+*
+*************
+* Impedances
+*
+* Zray
+'SI' (> vs10 0.0);
+Zray=ps10/vs10;
+'FINSI' ;
+* Zentree
+SI (> vs00 0.0);
+Ze=ps00/vs00;
+FINSI;
+*
+************************************
+* Pression parois/axe/ et Frottement
+* Auteur: N. Quaegebeur
+*** abs curvilignes de l'axe et la paroi
+EVOPS=evol CHPO (coord 2 haut) haut;
+EVOWS=evol CHPO (coord 2 wallt) wallt;
+UYY=exco 'UY' vn 'UY';
+*
+*** pression sur l'axe
+PP=INT_COMP mt pn haut;
+EVOPP=(evol CHPO PP haut);
+Preaxe=EVOL MANU (EXTR EVOPS ORDO) (EXTR EVOPP ORDO);
+*pmax=2*pi*f1*ro*umax;
+pmax='MAXIMUM' PP;
+*dess Preaxe 'TITRE' 'Pression sur axe' YBOR (-1*pmax-0.1) (pmax+0.1);
+*
+*** vitesse sur l'axe
+PP2=INT_COMP mt UYY haut;
+vmax = 'MAXIMUM'  PP2;
+EVOPP2=(evol CHPO PP2 haut);
+Vitaxe=EVOL MANU (EXTR EVOPS ORDO) (EXTR EVOPP2 ORDO);
+*dess Vitaxe TITR 'Uy sur axe' YBOR (-1*vmax) vmax;
+*
+*** Intensite sur l'axe
+I=UYY*PP;
+II=INT_COMP mt I haut;
+imax = 'MAXIMUM' II;
+EVOI=evol CHPO II haut;
+Intaxe=EVOL MANU (EXTR EVOPS ORDO) (EXTR EVOI ORDO);
+*dess Intaxe TITR 'Intensite acoustique sur axe' YBOR (-1*imax) imax;
+*
+*** Frottement sur la paroi - on calcule ici dUy/dy
+* Auteur: P.-Y. Lagrée 
+Uxdey= kcht $mt scal sommet (exco 'UY' vn);
+GRADU = KOPS Uxdey 'GRAD' $mt;
+DUDY = KCHT $mt 'SCAL' 'CENTRE' (EXCO 'UX' GRADU);
+DUDY = ELNO $mt DUDY;
+DUDY = KOPS DUDY '*' (-1.);
+EVDUDY = EVOL 'CHPO' DUDY SCAL wallt;
+Taupar=EVOL MANU (EXTR EVOWS ORDO) (EXTR EVDUDY ORDO);
+*dess Taupar 'TITR' 'Frottement Parietal';
+*
+**pression paroi
+PP=INT_COMP mt pn wallt;
+maxp = 'MAXIMUM' PP;
+EVOPP=(evol CHPO PP wallt);
+Prepar=EVOL MANU (EXTR EVOWS ORDO) (EXTR EVOPP ORDO);
+*dess Prepar TITR 'P paroi' YBOR (-1*maxp) maxp;
+*
+*******************
+* Pressions et vitesses a l'entree, la sortie, au col
+*
+* entree
+* pres
+*
+*
+EVOPS = 'EVOL' 'CHPO' (coord 1 entree) entree;
+*
+PP=INT_COMP mt pn entree;
+EVOPP=(evol CHPO PP entree);
+p_ent=EVOL MANU (EXTR EVOPS ABS) (EXTR EVOPP ORDO);
+* vit
+*
+PV=INT_COMP mt UYY entree;
+EVOPV = (evol CHPO PV entree);
+v_ent=EVOL MANU (EXTR EVOPS ABS) (EXTR EVOPV ORDO);
+*
+* sortie
+*
+* pres
+EVOPS = 'EVOL' 'CHPO' (coord 1 sortie) sortie;
+*
+PP=INT_COMP mt pn sortie;
+EVOPP=(evol CHPO PP sortie);
+p_sor=EVOL MANU (EXTR EVOPS ABS) (EXTR EVOPP ORDO);
+*
+* vit
+PV=INT_COMP mt UYY sortie;
+EVOPV=(evol CHPO PV sortie);
+v_sor=EVOL MANU (EXTR EVOPS ABS) (EXTR EVOPV ORDO);
+*
+* col
+EVOPS = 'EVOL' 'CHPO' (coord 1 col) col;
+*
+* press
+PP=INT_COMP mt pn col;
+EVOPP=(evol CHPO PP col);
+p_col=EVOL MANU (EXTR EVOPS ABS) (EXTR EVOPP ORDO);
+*
+* vit
+PV=INT_COMP mt UYY col;
+EVOPV=(evol CHPO PV col);
+v_col=EVOL MANU (EXTR EVOPS ABS) (EXTR EVOPV ORDO);
+*v_col=1;
+*
+RESPROC ps00 ps01 ps03 ps05 ps07 ps10 ps11 ps12 vs00
+vs10 vs11 vs12 Zray Ze preaxe vitaxe intaxe taupar prepar
+p_ent v_ent p_sor v_sor p_col v_col;
+*
+'FINPROC';
+*

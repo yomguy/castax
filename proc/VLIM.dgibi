@@ -1,0 +1,17 @@
+*
+* VLIM : Procedure pour définir les conditions aux limites
+*
+'DEBPROC' VLIM ;
+'ARGUMENT' rv*'TABLE';
+'ARGUMENT' t*'FLOTTANT' ;
+   rv . 'CLIM' = '-' (rv . 'CLIM') (rv . 'CLIM') ;
+   vvent  = '*' Umax ('SIN' ('*' ('*' 360.D0 freq) t) ) ;
+   vent   = 'MANUEL' 'CHPO' entmp1 1 'UY' vvent 'NATURE' 'DISCRET' ;
+*
+* Conditions aux limites
+*
+   rv = 'EQEX' rv 'CLIM'
+          'UN' 'VIMP' entmp1 vent ;
+'FINPROC' ;
+*
+* Fin de VLIM

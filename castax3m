@@ -1,0 +1,102 @@
+#!/bin/sh
+# ===================================================================
+# castax3m: a tool for launching Castax iteratively 
+# (multi-threading is almost possible)
+#
+# date: 03/03/05
+#
+# This program is part of Castax.
+#
+# Copyright (C) 2002-2005 by Guillaume Pellerin <pellerin@ccr.jussieu.fr>
+#
+# This software is governed by the CeCILL license under French law and
+# abiding by the rules of distribution of free software.  You can  use, 
+# modify and/ or redistribute the software under the terms of the CeCILL
+# license as circulated by CEA, CNRS and INRIA at the following URL
+# "http://www.cecill.info". 
+# 
+# As a counterpart to the access to the source code and  rights to copy,
+# modify and redistribute granted by the license, users are provided only
+# with a limited warranty  and the software's author,  the holder of the
+# economic rights,  and the successive licensors  have only  limited
+# liability. 
+# 
+# In this respect, the user's attention is drawn to the risks associated
+# with loading,  using,  modifying and/or developing or reproducing the
+# software by the user in light of its specific status of free software,
+# that may mean  that it is complicated to manipulate,  and  that  also
+# therefore means  that it is reserved for developers  and  experienced
+# professionals having in-depth computer knowledge. Users are therefore
+# encouraged to load and test the software's suitability as regards their
+# requirements in conditions enabling the security of their systems and/or 
+# data to be ensured and,  more generally, to use and operate it in the 
+# same conditions as regards security. 
+# 
+# The fact that you are presently reading this means that you have had
+# knowledge of the CeCILL license and that you accept its terms.
+# =======================================================================
+
+# PARAMETERS
+
+# Frequencies of the input sinusoid velocity (Hz)
+tfreq=( 60 )
+#tfreq=( 30 40 50 60 70 )
+
+# File for the 2D profile of the duct (placed in  geo/)
+profil='tuy25.2527.geo';
+
+# Input velocity amplitudes (m/s) 
+tus=( 0.5 )
+#tus=( 9.0 6.75 4.5 1.0 0.5  )
+#tus=( 1.0 0.75 0.5 )
+    
+    # math definition
+    # umax=2.0
+    # nus=3
+    # umin=0.5
+    ## Number of successive tests ( $umin * (2^($n-1) )
+    # for (( i = 0; i <= ($n - 1); i++ )); do
+    # tus[$i]=$(echo "scale=1; $umax * (2^($i))" | bc)
+    # done
+
+# Result directory
+res="/home/$USER/castax_res"
+
+# Backup directory
+bckp="/home/$USER/castax_bckp"
+
+# Videos ?
+video="yes"
+
+# END OF PARAMETERS
+
+# ----------------------------------------------
+
+nfreq=${#tfreq[*]}
+nus=${#tus[*]}
+
+if [ ! -d $res ]; then
+ mkdir $res
+fi
+#
+for (( i = 0; i <= ($nus - 1); i++ ))
+  do
+  for (( k = 0; k <= ($nfreq - 1); k++ ))
+  do
+  u=${tus[$i]}
+  freq=${tfreq[$k]}
+  echo $u
+  if [ $video = "yes" ]; then
+  castax $u $freq $profil $bckp $res videos
+  else
+  castax $u $freq $profil $bckp $res
+  fi
+  echo "Calcul terminé : umax="$u"m/s, profil="$profil
+  date
+  done
+done
+
+echo "castax3m terminé !"
+date
+
+# end of castax3m

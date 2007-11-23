@@ -1,0 +1,58 @@
+*==================================================================
+* Calcul du résidu en pression et arrêt suivant un critère
+*==================================================================
+* E/  : RVX      : TABLE     : TABLE des données créées par EQEX
+*                  ARG1      : Fréquence d'impression
+*                  ARG2      : Critère d'arrêt
+*  /S : MAT1     : MATRIK    : Objet vide
+*  /S : CHP1     : CHPO      : Objet vide
+*------------------------------------------------------------------
+* Auteur: F. DABBENE
+* adapté par G. PELLERIN
+*------------------------------------------------------------------
+'DEBPROC' residu rvx*table ;
+   RV   = rvx . 'EQEX' ;
+   FREQ = RVX . 'ARG1' ;
+   EPS0 = RVX . 'ARG2' ;
+   NITER = RV . 'NITER' ;
+   DD = RV . 'PASDETPS' . 'NUPASDT' ;
+   NN = DD '/' FREQ ;
+   L0 = 'EGA' (DD '-' (FREQ*NN)) 0 ;
+   'SI' L0 ;
+      RANG0 = RV . 'PASDETPS' . 'NUPASDT' ;
+      TIME0 = RV . 'PASDETPS' . 'TPS' ;
+      TN0   = RV . 'INCO' . 'PN'  ;
+      TNM0  = RV . 'INCO' . 'PN2' ;
+      'SI' ('EGA' ('MAXIMUM' 'ABS' TN0) 0.0);
+      ERR0  = ('MAXIMUM' ('ABS' (TN0 '-' TNM0))) '+' 1.D-20;
+      'SINON';
+      ERR0  = (('MAXIMUM' ('ABS' (TN0 '-' TNM0))) '+' 1.D-20) '/'
+               ('MAXIMUM' 'ABS' TN0) ;
+      'FINSI' ;
+      ERR10 = ('LOG' ERR0 ) '/' ('LOG' 10.) ;
+      tty1 = 'CHAINE' 'Pas de temps : ' RANG0 ' (' TIME0 's)';
+      tty2 = 'CHAINE' 'Erreur relative max sur P:'
+         '10^(' ERR10 ')=' ERR0;
+*'MESSAGE' tty1;
+      'MESSAGE' tty2;
+      RV . 'INCO' . 'IT'  = RV . 'INCO' . 'IT' 'ET' ('PROG' RANG0) ;
+      RV . 'INCO' . 'TI'  = RV . 'INCO' . 'TI' 'ET' ('PROG' TIME0) ;
+      RV . 'INCO' . 'ER'  = RV . 'INCO' . 'ER' 'ET' ('PROG' ERR10) ; 
+      EV1 = 'EVOL' 'MANUEL' (RV . 'INCO' . 'IT') (RV . 'INCO' . 'ER') ;
+      Y1 = ('LOG' EPS0) '/' ('LOG' 10) ;
+      'SI' POST1 ;
+           X1 = 0. ; X2 = RV . 'ITMA' ;
+          'DESSIN' EV1 'YBOR' Y1 0. 'NCLK' ;
+      'FINSI' ;
+      'SI' POST2 ;
+           L1 = (PROG 10. PAS 5. 90.)* 1.D-3 ;
+           trace L1 tn0 mt cgeo 'TITR' 'Pression' 'NCLK' ;
+      'FINSI' ;
+      'SI' ((ERR10 < Y1) 'ET' (DD > 10)) ;
+         RV . 'TFINAL' = RV . 'PASDETPS' . 'TPS' ;
+      'FINSI' ;
+   'FINSI' ;
+   RV . 'INCO' . 'PN2' = 'COPIER' RV . 'INCO' . 'PN' ;
+   mat1 chp1 = 'KOPS' 'MATRIK' ;
+'FINP' mat1 chp1 ;
+*------------------------------------------------------------------

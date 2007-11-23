@@ -1,0 +1,26 @@
+#!/bin/sh
+#
+# install-sh: script for castax setup (just creating needed paths)
+# this script is a part of the package castax
+#
+# Copyright (C) 2005 by Guillaume Pellerin <pellerin@ccr.jussieu.fr>
+#
+# Castax and its parts are governed by the CeCILL license under
+# French law and abiding by the rules of distribution of free software.  You
+# can  use, modify and/ or redistribute the software under the terms of the
+# CeCILL license as circulated by CEA, CNRS and INRIA at the following URL
+# "http://www.cecill.info". 
+# -------------------------------------
+#
+# Creates environnement variable for Castax
+currdir=`pwd`
+if [ ! -e ~/.castax ]; then
+ echo $currdir > ~/.castax
+fi
+
+export CASTAX=`cat ~/.castax`
+
+# adapting PATH variable
+if [ -x `echo $PATH | grep "castax"` ]; then
+export PATH="$PATH":`cat ~/.castax`/bin
+fi

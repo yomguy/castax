@@ -1,0 +1,20 @@
+#!/bin/zsh
+#
+# killcast tue les jobs castem qui traînent
+
+# on sélectionne parmi les jobs ceux de l'utilisateur contenant cast
+# et on en prélève le n°
+ps -ef | grep $USER | grep 'cast' | awk '{print $2}' > .killcast
+
+# on les tue un par un
+for num in `cat .killcast` ; do
+# on ne se tue pas soi-même
+  if [ $num != $$ ]; then
+#   on voudra tuer le grep lui-même, qui est fini, 
+#   et donc on aura un message d'erreur qu'on zappe  
+    kill -9 $num 2>/dev/null
+  fi
+done
+
+# ménage
+rm -f ./.killcast

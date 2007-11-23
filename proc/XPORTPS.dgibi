@@ -1,0 +1,264 @@
+****************************************************************
+* NOM         : XPORTPS 
+* DESCRIPTION : Procédure intérative d'export de tables de soustypes
+*               CHPOIN vers un fichier externe postscript, ou bien
+*               de tables de soustypes EVOLUTION vers postscript ET texte
+*
+* LANGAGE     : GIBIANE-CAST3M
+* AUTEURS     : Guillaume PELLERIN (UPMC/LAM)
+*               pellerin at ccr.jussieu.fr
+*               Adaptée de XPLORPR initialement créée par:
+*               Stéphane GOUNAND (CEA/DEN/DM2S/SFME/LTMF)
+*               gounand at semt2.smts.cea.fr
+*
+*****************************************************************
+* Usage:
+* XPORTPS matab mavar montype monfic echfix [ni ndebu nfin]
+* 
+* ARGUMENTS:
+* matab : table générale des résultats 
+* mavar : nom de la variable (pression, vitesses, etc..) contenue dans matab  
+* montype : type de la variable à exporter (VECT, SCAL, EVOL, EVOLS)
+* monfic : nom du fichier d'export .ps
+* echfix : booléen fixant l'échelle au min et max de chaque variable sur
+*          l'ensemble du mouvement (VRAI) ou bien sur chaque itération (FAUX)
+* ni, ndebu, nfin : paramètres de sous-échantillonage
+*
+***********************************************************************
+* Prière de PRENDRE LE TEMPS de compléter les commentaires
+* en cas de modification de ce sous-programme afin de faciliter
+* la maintenance !
+***********************************************************************
+*
+'DEBPROC' XPORTPS ;
+'ARGUMENT' matab*'TABLE';
+'ARGUMENT' mavar/'MOT';
+'ARGUMENT' montype/'MOT';
+* Type SCAL ou VECT
+'ARGUMENT' monfic/'MOT';
+'ARGUMENT' echfix/'LOGIQUE';
+'ARGUMENT' ni/'ENTIER  ';
+'ARGUMENT' ndebu/'ENTIER  ';
+'ARGUMENT' nfin/'ENTIER  ';
+*
+'SI' ('OU' ('EGA' montype 'EVOL') ('EGA' montype 'EVOLS'));
+   monfic = 'ET' 'ps/' ('ET' mavar '.ps');
+'FINSI';
+*
+'OPTION' TRAC psc;
+'OPTION' FTRA monfic;
+*
+* Definition des projections si champ vectoriel
+'SI' ('EGA' mavar 'VITX');
+   axproj = 'UX';
+   mavar = 'VITESSES';
+'FINSI';
+'SI' ('EGA' mavar 'VITY');
+    axproj = 'UY';
+    mavar = 'VITESSES';
+'FINSI';
+'SI' ('EGA' mavar 'HOWX');
+   axproj = 'UX';
+   mavar = 'HOWE';
+'FINSI';
+'SI' ('EGA' mavar 'HOWY');
+    axproj = 'UY';
+    mavar = 'HOWE';
+'FINSI';
+*
+*
+tt = matab . mavar;
+nit = 'DIME' tt ;
+nitm1 = '-' nit 1 ;
+nmin = 0 ;
+nmax = nitm1 ;
+*
+* Sous echantillonnage pour les traces ?
+ssech = 1;
+'SI' ('NON' ('EXISTE' ni)) ;
+   ni = nit;
+*ni = 'MINIMUM' ('LECT' nit (nit '/' ssech)) ;
+'FINSI' ;   
+'SI' ('NON' ('EXISTE' ndebu)) ;
+   ndebu = nmin ;
+'FINSI' ;   
+'SI' ('NON' ('EXISTE' nfin)) ;
+   nfin = nmax ;
+'FINSI' ;
+*
+lindic = ISELECT ndebu nfin ni nmin nmax ;
+*
+ind=1;
+*
+* Détermination des échelles
+*
+*  Type de sortie : VECT
+*
+ 'SI' ('EGA' montype 'VECT');
+   maxv   = 'PROG' ;
+   maxur  = 'PROG' ;
+   minur  = 'PROG' ;
+   maxuz  = 'PROG' ;
+   minuz  = 'PROG' ;
+   'REPETER' iindic ('DIME' lindic) ;
+   idimt = 'EXTRAIRE' lindic &iindic ;
+   myvit = tt . idimt ;
+   myur  = 'EXCO' 'UR' myvit 'NOID' ;
+   myuz  = 'EXCO' 'UZ' myvit 'NOID' ;
+   maxv  = APPEND maxv  ('MAXIMUM' myvit 'ABS') ;
+   maxur = APPEND maxur ('MAXIMUM' myur) ;
+   minur = APPEND minur ('MINIMUM' myur) ;
+   maxuz = APPEND maxuz ('MAXIMUM' myuz) ;
+   minuz = APPEND minuz ('MINIMUM' myuz) ;
+   'FIN' iindic ;
+   maxv = 'MAXIMUM' maxv ;
+   'FINSI';
+*
+*  Type de sortie : SCAL
+*
+   'SI' ('EGA' montype 'SCAL');
+   maxt  = 'PROG' ;
+   mint  = 'PROG' ;
+   'REPETER' iindic ('DIME' lindic) ;
+   idimt = 'EXTRAIRE' lindic &iindic ;
+*  mytem = 'REDU' (tt . idimt) mt ;
+   mytem = tt . idimt ;
+*
+*  On projete sur UX ou UY si on demande le scalaire de la vitesse
+*
+   'SI' ('EGA' axproj 'UX');
+      mytem = 'EXCO' 'UX' mytem 'UX';
+   'FINSI';
+   'SI' ('EGA' axproj 'UY');
+       mytem = 'EXCO' 'UY' mytem 'UY';
+   'FINSI';
+*
+   maxt  = 'ET' maxt ('PROG' ('MAXIMUM' mytem)) ;
+   mint  = 'ET' mint ('PROG' ('MINIMUM' mytem)) ;
+   'FIN' iindic ;
+   maxt = 'MAXIMUM' maxt ;
+   mint = 'MINIMUM' mint ;
+   maxv = 'PROG' mint maxt ;
+   'FINSI';
+*
+*  Type de sortie : EVOLUTION (une seule)
+*
+   'SI' ('EGA' montype 'EVOL');
+     malist = 'PROG' ;
+     tps = 'PROG' ;
+     ttps = matab . 'time';
+     'REPETER' iindic ('DIME' lindic) ;
+      idimt = 'EXTRAIRE' lindic &iindic ;
+      malist = 'ET' malist ('PROG' tt.idimt) ;
+      tps = 'ET' tps ('PROG' ttps.idimt);
+      'FIN' iindic;
+      maxv = 'MAXIMUM' malist;
+      minv = 'MINIMUM' malist;
+    'FINSI' ;
+*
+*oisov = 'VALEUR' 'ISOV' ;
+*'OPTION' 'ISOV' 'SURF' ;
+*
+* Sorties
+*
+* si EVOL
+   'SI' ('EGA' montype 'EVOL');
+    EVOP = 'EVOL' 'MANU' 'TEMPS' tps mavar malist;
+    tableg = 'TABLE' ;
+    tableg.1 = 'MOT' 'MARQ LOSA';
+    tableg.TITRE = 'TABLE' ;
+    tableg.TITRE = '';
+   'DESSIN'  EVOP 'XBOR' 0. (maxi tps) 'YBOR' (1.5*minv) (1.5*maxv)
+               'LEGE' tableg ;
+    JECRI2 tps malist ('DIME' lindic) ('CHAINE' 'txt/ev_' mavar '.txt');
+   'FINSI';
+*
+* si EVOLS
+   'SI' ('EGA' montype 'EVOLS');
+   'REPETER' mindic ('-' ('DIME' lindic) 1);
+    idimt = '+' ('EXTRAIRE' lindic &mindic) 1 ;
+    EVOF = tt.idimt ;
+    tableg = 'TABLE' ;
+    tableg.1 = 'MOT' 'MARQ LOSA';
+    tableg.TITRE = 'TABLE' ;
+    tableg.TITRE = 'CHAINE' mavar ', inc=' idimt;
+   'DESSIN'  EVOF  'LEGE' tableg ;
+    x = 'EXTRAIRE' EVOF 'ABSC';
+    y = 'EXTRAIRE' EVOF 'ORDO';
+    idfic = idimt;
+    'SI' ('<EG' idimt 999);
+      idfic = 'CHAINE' '0' idimt;
+    'FINSI' ;
+    'SI' ('<EG' idimt 99);
+      idfic = 'ET' '0' idfic;
+    'FINSI' ;
+    'SI' ('<EG' idimt 9);
+      idfic = 'ET' '0' idfic;
+    'FINSI' ;
+    ficev = 'CHAINE' 'txt/ev_' mavar '_' idfic '.txt';
+    JECRI2 x y ('DIME' x) ficev;
+   'FIN' mindic;
+   'FINSI';
+*
+* si SCAL ou VECT
+   'SI'  ('OU' ('EGA' montype 'SCAL') ('EGA' montype 'VECT'));
+*
+   'REPETER' kindic  ('DIME' lindic);
+*
+   idimt = 'EXTRAIRE' lindic &kindic ;
+*     from 0.4.0
+   'SI' ('EXISTE' matab 'TIME');
+   tem = matab.TIME.idimt ;
+   'SINON';
+   tem = matab.TEMPS.idimt ;
+   'FINSI' ;
+   cht = tt . idimt ;
+*
+* On projete sur UX ou UY si on demande le scalaire de la vitesse
+*
+   'SI' ('EGA' axproj 'UX');
+      cht = 'EXCO' 'UX' cht 'UX';
+   'FINSI';
+   'SI' ('EGA' axproj 'UY');
+      cht = 'EXCO' 'UY' cht 'UY';
+   'FINSI';
+*
+   titt = 'CHAINE' ':t='tem's:'titglob;
+   titch = 'CHAINE' mavar titt ;
+*
+   'SI' echfix ;
+      TRCHPO mt cht maxv titch;
+   'SINON' ;      
+      TRCHPO mt cht titch;
+   'FINSI' ;
+*
+   'FIN' kindic;
+  'FINSI' ;
+
+* Cas des trajectoires
+ 'SI'  ('EGA' mavar 'TRAJECTOIRES');
+*
+   'REPETER' kindic  ('DIME' lindic);
+*
+   idimt = 'EXTRAIRE' lindic &kindic ;
+*     from 0.4.0
+   'SI' ('EXISTE' matab 'TIME');
+      tem = matab.TIME.idimt ;
+   'SINON';
+      tem = matab.TEMPS.idimt ;
+   'FINSI' ;
+   
+   cht = tt . idimt ;
+   titt = 'CHAINE' ':t='tem's:'titglob;
+   titch = 'CHAINE' mavar titt ;
+   'TRACER' cht 'TITRE' titch;
+
+   'FIN' kindic;
+ 'FINSI' ;
+   
+'OPTION' FTRA 'tmp.ps';
+*
+'FINPRO';
+*
+* Fin de XPORTPS
+*

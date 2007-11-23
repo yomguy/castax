@@ -1,0 +1,41 @@
+*************************************************************************
+* NOM         : VPRCOU
+* DESCRIPTION : Procedure pour récupérer vit, pres, rt (rotationnel), cou (la
+*		fonction de courant Courant 2D axi) et rez (le residu) projetes
+*		sur mt dans la table de résultat renvoyée par castax
+*
+* LANGAGE     : GIBIANE-CAST3M
+* AUTEURS     : Stéphane GOUNAND (CEA/DEN/DM2S/SFME/LTMF)
+*               gounand@semt2.smts.cea.fr
+*		Guillaume Pellerin (UPMC/LAM)
+*		pellerin@ccr.jussieu.fr
+*
+* Ce fichier fait partie du programme Castax
+*
+* Copyright 2005 (C) by Stéphane Gounand <gounand@semt2.smts.cea.fr>
+
+*************************************************************************
+*
+'DEBPROC' VPRCOU ;
+'ARGUMENT' rv*'TABLE';
+*
+   vit  = rv . 'INCO' . 'UN' ;
+   nlincour = 'DIME' RV.INCO.ER;
+   'SI' ('EGA' nlincour 0);
+   rez = 0;
+   'SINON';
+   rez = 'EXTRAIRE' RV.INCO.ER nlincour;
+   'FINSI' ;
+   cou = COURANT (RV.INCO.'UN') $mt $fix;
+   rt = 'KOPS' rv.'INCO'.'UN' 'ROT' $mt; 
+   'OPTION' 'MODE' 'PLAN' ;
+   rt = 'ELNO'  $mt ('KCHT'  $mt SCAL CENTRE rt) CENTRE;
+   pres = 'ELNO' $mt (rv . 'INCO' . 'PN') discp ;
+*  pres = '*' pres rho ;
+   'OPTION' 'MODE' 'AXIS' ;
+*
+   'RESPRO' vit pres rt cou rez;
+'FINPROC' ;
+*
+* Fin de VPRCOU
+*

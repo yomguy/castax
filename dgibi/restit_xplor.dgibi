@@ -1,0 +1,9 @@
+*
+* restit_xplor.dgibi
+* a part of castax restit tools for xploring
+*
+OPTION 'RESTITUER' 'data.sauv';
+'RESTITUER';
+*
+XPLORVPR res;
+*

@@ -1,0 +1,175 @@
+#!/bin/zsh
+#
+# NOM         : pstopsn
+# DESCRIPTION : .ps castem -> n .ps files
+# LANGAGE     : Shell script (zsh 4.1.0-dev-5 (i586-mandrake-linux-gnu))
+# AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SFME/LTMF)
+#               mél : gounand@semt2.smts.cea.fr
+#		adapted for Castax by Guillaume Pellerin <pellerin@ccr.jussieu.fr>
+# DEPENDANCES : sed (GNU sed version 4.0.3), 
+#               convert (Version: ImageMagick 5.5.4 02/01/03 Q16 
+#                        http://www.imagemagick.org), 
+#               psselect
+#               ppmtompeg (Using libpbm from Netpbm Version: Netpbm 9.24)
+# VERSION    : v1, 03/12/2003, version initiale
+# KNOWN BUGS : * the .mpg file might be truncated when $Sval<>1 because
+#                the resolution of the .ppm files won't necessarily be
+#                a multiple of 16 (MPEG-1 spec)
+# Debugging
+#set -x
+function usage
+{
+echo "$SCRIPT [-c] [-q] (0,1) [-s] (0, 1, 2) [-n] i [-a] arguments.ps
+this script maps .ps files from Castem 2000 into .mpg files (MPEG-1 format)
+        Arguments:
+                -c : no pretreatment of castem postscript file
+                -q : quality (0=normal (default) ; 1=better (marginally))
+                -s : resolution (0=small ; 1=normal (default) ; 2=big)
+                -n : repeat an image i times in .mpg (default i=1)
+                -a : append q s n parameters to output filename
+"
+exit 0
+}
+function error
+{
+rm -fr $TMPDIR 
+echo "Error or interruption in $SCRIPT"
+exit 1
+}
+SCRIPT=${0##*/}
+currdir=`pwd`
+# chemin pour castem2epsf2
+castaxdir=$CASTAX
+# Mettre un chemin absolu...
+#TMPDIR=/tmp/tmp$$
+TMPDIR=$currdir/tmp$$
+#
+if [ $# = 0 ] ;  then 
+    usage
+fi
+#
+Cflag=1
+Qval=0
+Sval=1
+Nval=1
+Aflag=0
+while getopts "hcq:s:n:a" Arg ; do
+  case $Arg in
+    h) usage ;;
+    c) Cflag=0 ;;
+    q) Qval=$OPTARG ;;
+    s) Sval=$OPTARG ;;
+    n) Nval=$OPTARG ;;
+    a) Aflag=1 ;;
+    *) usage ;;
+  esac
+done
+shift $(( OPTIND - 1 ))
+# Traitement des options
+case $Qval in
+    0) Qv1=8 ; Qv2=10 ; Qv3=25 ;;
+    1) Qv1=1 ; Qv2=1 ; Qv3=1 ;;
+    *) echo "Qval=$Qval" not allowed ; error ;;
+esac
+case $Sval in
+    0) Res=70% ;;
+    1) Res=100% ;;
+    2) Res=140% ;;
+    *) echo "Sval=$Sval" not allowed ; error ;;
+esac
+if [ ! $Nval -ge 1 ] ; then
+     echo "Nval=$Nval" should be greater than 1 ; error
+fi
+# Traitement des exceptions
+trap 'error' 2 3
+for filename
+do
+  bfn=`basename $filename .ps`
+  if [ ! -f $bfn.ps ] ;  then
+      echo "$bfn.ps is not a valid file"
+      error
+  fi
+  case $Aflag in
+      0) ofn=$bfn.mpg ;;
+      1) ofn=${bfn}q${Qval}s${Sval}n${Nval}.mpg ;;
+      *) echo "Aflag=$Aflag" not allowed ; error ;;
+  esac
+  mkdir $TMPDIR
+  cd $TMPDIR
+# sed parameter file for pretreatment of .ps Castem file
+#   Bigger bounding box (because of bigger font) resolution should be a multiple of 16 
+#   in both directions (MPEG-1 spec)
+  sedav='^%%BoundingBox: 0 0 593 841' ; sedap='%%BoundingBox: 0 -16 592 832' ; echo "s/$sedav/$sedap/" >> $bfn.sed
+#   Suppression of useless text (in my opinion)
+  sedav='^(VAL - ISO)' ; sedap='()' ; echo "s/$sedav/$sedap/" >> $bfn.sed
+#  sedav='^(<.\{9\})' ; sedap='()' ; echo "s/$sedav/$sedap/" >> $bfn.sed
+#  sedav='^(>.\{9\})' ; sedap='()' ; echo "s/$sedav/$sedap/" >> $bfn.sed
+  sedav='^(GIBI FECIT)' ; sedap='()' ; echo "s/$sedav/$sedap/" >> $bfn.sed
+#  sedav='^(COMPOSANTES)' ; sedap='()' ; echo "s/$sedav/$sedap/" >> $bfn.sed
+#  sedav='^(VECTEURS)' ; sedap='()' ; echo "s/$sedav/$sedap/" >> $bfn.sed
+#   Bigger, more readable font
+   sedav='\/Courier' ; sedap='\/CourierBold' ; echo "s/$sedav/$sedap/" >> $bfn.sed
+   sedav='9 scalefont' ; sedap='10 scalefont' ; echo "s/$sedav/$sedap/" >> $bfn.sed
+#   Thicker linewidth
+  sedav='^0\.1 setlinewidth' ; sedap='6 setlinewidth' ; echo "s/$sedav/$sedap/" >> $bfn.sed
+#   I personnaly prefer black background and white pen for movies
+  sedav='\(^%%EndProlog\)' 
+  sedap='\/backgroundColor [0.0 0.0 0.0] def\\n\/SetColor{\\naload pop setrgbcolor\\n} def\\n\/dobg { clippath backgroundColor SetColor fill } def\\n\1' 
+  echo "s/$sedav/$sedap/" >> $bfn.sed
+  sedav='\(^StartPage\)' ; sedap='\1\\ndobg\\nD0' ; echo "s/$sedav/$sedap/" >> $bfn.sed
+  sedav='^\/D0 { 0\.0000 0\.0000 0\.0000' 
+  sedap='\/D0 { 1\.0000 1\.0000 1\.0000' 
+  echo "s/$sedav/$sedap/" >> $bfn.sed
+  sedav='^\/C0 { 0\.' 
+  sedap='\/C0 { 1\.' 
+  echo "s/$sedav/$sedap/" >> $bfn.sed
+# End of sed parameter file
+  case $Cflag in
+      0) ln -sf $currdir/$bfn.ps ./$bfn.ps ;;
+      1) sed -f $bfn.sed $currdir/$bfn.ps > ./$bfn.ps ;;
+      *) echo "Cflag=$Cflag" not allowed ; error ;;
+  esac
+# get number of pages in the postscript file
+  lpag=`psselect -p_1 ./$bfn.ps 2>&1 >/dev/null`
+  npag=`echo $lpag |sed 's/^\[\([0-9][0-9]*\)\].*$/\1/'`
+  echo "$npag"" pages"
+# generate the .ppm and there list
+  for (( i = 1; i <= $npag; i += 1 )); do
+      psselect -q $i $bfn.ps $bfn.$i.ps
+      $castaxdir/bin/castem2epsf2 -t $bfn.$i.ps temp
+      mv temp.1.epsf $bfn.$i.ps
+# .ps -> .ppm
+      convert -rotate -0 -geometry $Res $bfn.$i.ps $bfn.$i.ppm
+      \rm -f $bfn.$i.ps
+# .ppm list files (repeat $Nval times each name), .mpg framerate will be around 
+# 30 images/seconds
+      repeat $Nval echo ./$bfn.$i.ppm >> $bfn.lst
+  done 
+# data file for ppmtompeg
+  echo "OUTPUT $ofn
+INPUT_DIR .
+INPUT
+`cat $bfn.lst`
+END_INPUT
+BASE_FILE_FORMAT	PPM
+INPUT_CONVERT   *
+IQSCALE		$Qv1
+PQSCALE		$Qv2
+BQSCALE		$Qv3
+PATTERN		IBBPBBPBBPBBPBBP
+FORCE_ENCODE_LAST_FRAME
+GOP_SIZE	16
+SLICES_PER_FRAME	1
+PIXEL		HALF
+RANGE		10
+PSEARCH_ALG	LOGARITHMIC
+BSEARCH_ALG	SIMPLE
+REFERENCE_FRAME	ORIGINAL
+FRAME_RATE 30
+" > $bfn.mpi
+  ppmtompeg -realquiet -no_frame_summary $bfn.mpi
+  mv $ofn $currdir
+  cd $currdir
+  rm -fr $TMPDIR
+done
+exit 0

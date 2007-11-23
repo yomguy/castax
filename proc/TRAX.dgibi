@@ -1,0 +1,178 @@
+****************************************************************
+* NOM         : TRAX
+* DESCRIPTION : calcule la trajectoire d'une particule à partir des données
+*               de vitesse depuis castax
+*
+* LANGAGE     : GIBIANE-CAST3M
+* AUTEUR      : Guillaume PELLERIN (UPMC/LAM)
+*               pellerin at ccr.jussieu.fr
+*
+* Copyright 2005 (C) by Guillaume Pellerin <pellerin@ccr.jussieu.fr>
+*
+* Ce logiciel est régi par la licence CeCILL soumise au droit français et
+* respectant les principes de diffusion des logiciels libres. Vous pouvez
+* utiliser, modifier et/ou redistribuer ce programme sous les conditions
+* de la licence CeCILL telle que diffusée par le CEA, le CNRS et l'INRIA 
+* sur le site "http://www.cecill.info".
+* 
+* En contrepartie de l'accessibilité au code source et des droits de copie,
+* de modification et de redistribution accordés par cette licence, il n'est
+* offert aux utilisateurs qu'une garantie limitée. Pour les mêmes raisons,
+* seule une responsabilité restreinte pèse sur l'auteur du programme, le
+* titulaire des droits patrimoniaux et les concédants successifs.
+* 
+* A cet égard l'attention de l'utilisateur est attirée sur les risques
+* associés au chargement, à l'utilisation, à la modification et/ou au
+* développement et à la reproduction du logiciel par l'utilisateur étant 
+* donné sa spécificité de logiciel libre, qui peut le rendre complexe à 
+* manipuler et qui le réserve donc à des développeurs et des professionnels
+* avertis possédant des connaissances informatiques approfondies. Les
+* utilisateurs sont donc invités à charger et tester l'adéquation du
+* logiciel à leurs besoins dans des conditions permettant d'assurer la
+* sécurité de leurs systèmes et ou de leurs données et, plus généralement, 
+* à l'utiliser et l'exploiter dans les mêmes conditions de sécurité. 
+* 
+* Le fait que vous puissiez accéder à cet en-tête signifie que vous avez 
+* pris connaissance de la licence CeCILL, et que vous en avez accepté les
+* termes.
+*************************************************************************
+*
+* Usage:
+* TRAX matab n_rayon res_ray n_long res_long
+* 
+* ARGUMENTS:
+* matab : table des résultats en vitesse
+* n_rayon : nombre de particules sur le rayon (r)
+* res_ray : nombre de points de définition du maillage selon le rayon (r)
+* n_long : nombre de groupes de particules sur la longueur (z)
+* res_long : nombre de points de définition du maillage selon la longueur (z)
+* pdt : pas de temps
+*
+* Le conduit est donc divisé en (n_long+1) parties de nombre de mailles
+* identique. La croix désigne la point de départ, le carré l'arrivée.
+*
+***********************************************************************
+* Prière de PRENDRE LE TEMPS de compléter les commentaires
+* en cas de modification de ce sous-programme afin de faciliter
+* la maintenance !
+***********************************************************************
+*
+* Calcul des trajectoires
+*
+'DEBPROC' TRAX;
+'ARGUMENT' matab*TABLE     ;
+'ARGUMENT' n_rayon*ENTIER  ;
+'ARGUMENT' res_ray*ENTIER  ;
+'ARGUMENT' n_long*ENTIER   ;
+'ARGUMENT' res_long*ENTIER ;
+'ARGUMENT' pdt*FLOTTANT    ;
+*
+*'OPTION' 'DIME' 2 'ELEM' QUA8 'MODE' 'AXIS' ;
+* matab: table des vitesses
+
+tt = matab;
+nitmas = 'DIME' tt ;
+nr =  n_rayon;
+nz =  n_long;
+rry = res_ray;
+rlg = res_long;
+pdtt = pdt;
+
+dr = 'ENTIER' ('/' ('-' rry 1) nr);
+dz = 'ENTIER' ('/' rlg nz);
+
+capt.'m1_x' = 'TABLE' ;
+capt.'m1_y' = 'TABLE' ;
+
+
+'REPETER' iitmz nz;
+
+ 'REPETER' iitmr nr;
+
+  pm1=('/'('*' ord.('*' dz &iitmz) &iitmr) nr) absi.('*' dz &iitmz);
+
+  itcous = 0;
+  m1xy = mt 'POIN' 'PROC' pm1 ;
+  m1x m1y = 'COORDONNEE' m1xy;
+  capt.'m1_x'.itcous = m1x ;
+  capt.'m1_y'.itcous = m1y ;
+  m1x_old = capt.'m1_x'.itcous;
+  m1y_old = capt.'m1_y'.itcous;
+  pmi_old = m1x_old m1y_old;
+*
+        croix1 = 'DROI' 1 (('-' m1x 0.001) ('+' m1y 0.001))
+               (('+' m1x 0.001) ('-' m1y 0.001));
+        croix2 = 'DROI' 1 (('-' m1x 0.001) ('-' m1y 0.001))
+               (('+' m1x 0.001) ('+' m1y 0.001));
+        chem_1 = ('ET' croix1 croix2);
+
+ 'REPETER' iitmas nitmas;
+
+* 'MESSAGE' nitmas;
+* 'MESSAGE' &iitmas;
+* 'MESSAGE' &iitmz;
+* 'MESSAGE' &iitmr;
+
+  'SI' ('ET'  ('NON' ('EGA' nitmas 1)) ('NON' ('EGA' &iitmas 1)));
+   m1x_old = capt.'m1_x'.('-' itcous 1);
+   m1y_old = capt.'m1_y'.('-' itcous 1);
+   pmi_old = m1x_old m1y_old;
+   'FINSI' ;
+   
+* Calcul des vitesses
+   vx1 = 'EXTRAIRE'  tt.itcous 'UX' m1xy;
+   vy1 = 'EXTRAIRE'  tt.itcous 'UY' m1xy;
+*
+   m1x = '+' m1x_old ('*' vx1  pdtt);
+   m1y = '+' m1y_old ('*' vy1  pdtt);
+
+   pmii = m1x m1y;
+   m1xy = mt 'POIN' proc pmii ;
+   m1x m1y = 'COORDONNEE' m1xy;
+   capt.'m1_x'.itcous = m1x;
+   capt.'m1_y'.itcous = m1y;
+
+*   'SI' ('NON' ('EGA' &iitmas 1));
+        chem_1 = 'ET' chem_1 ('DROI' 1 pmi_old m1xy) ;
+*   'FINSI' ;
+
+   'SI' ('EGA' &iitmas nitmas);
+     car1 = 'DROI' 1 (('-' m1x 0.001) ('-' m1y 0.001))
+               (('-' m1x 0.001) ('+' m1y 0.001));
+     car2 = 'DROI' 1 (('-' m1x 0.001) ('+' m1y 0.001))
+               (('+' m1x 0.001) ('+' m1y 0.001));
+     car3 = 'DROI' 1 (('+' m1x 0.001) ('+' m1y 0.001))
+               (('+' m1x 0.001) ('-' m1y 0.001));
+     car4 = 'DROI' 1 (('+' m1x 0.001) ('-' m1y 0.001))
+               (('-' m1x 0.001) ('-' m1y 0.001));
+     chem_1 = car1 'ET' car2 'ET' car3 'ET' car4 'ET' chem_1 ;
+    'FINSI' ;
+
+    itcous = '+' itcous 1;
+    
+   'FIN' iitmas ;
+
+  'SI' ('EGA' &iitmr 1);
+   chemr = chem_1;
+  'SINON' ;
+   chemr = chemr 'ET' chem_1;
+  'FINSI';
+
+ 'FIN' iitmr;
+
+ 'SI' ('EGA' &iitmz 1);
+   chemz = chemr;
+ 'SINON' ;
+   chemz = chemz 'ET' chemr;
+ 'FINSI';
+
+'FIN' iitmz;
+
+chemz = 'ET' chemz cgeo;
+
+'RESPRO' chemz;
+
+* Fin Procedure TRAX
+*
+'FINPROC' ;
+*

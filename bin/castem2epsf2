@@ -1,0 +1,187 @@
+#!/bin/ksh
+#
+#    transformation des dessins postscript du fichier: nom_du_fichier
+#    de CASTEM 2000 dans plusieurs fichiers EPSF: nom_racine.num.epsf
+#
+#    utilisation:
+#        castem2epsf nom_du_fichier nom_racine
+#
+#    fichiers auxilliares necessaires:
+#         cut.awk rech_maxi.awk mod.awk sans_titre.awk larg_epsf
+#
+#    Auteurs : M.Bulik et A.Constantinecscu, LMS-X, Avril 1993
+#              Mathieu Courtois, Octobre 1997 - Juin 1999
+#
+#echo "*** Version MC du 09/05/2000 ***"
+#echo " "
+export CAS2PS_HOME=$CASTAX/bin
+export GAWK_DIR=/usr/bin
+
+ERR=1
+
+#integer nn
+BLA=1
+DEC=0
+LIG=0
+SIZ=1; nn=9
+TIT=0
+
+while getopts :bgls:t arg
+do
+  case $arg in
+   b) BLA=0 ;;
+   g) DEC=1 ;;
+   l) LIG=1 ;;
+   s) SIZ=0 ;
+      if [ ${OPTARG} -eq ${OPTARG} ]; then
+        nn=$OPTARG
+      else
+        echo "Il faut un nombre apres -$arg"
+	echo " "
+	ERR=0
+      fi ;;
+   :) echo "Il faut un nombre apres -$OPTARG."
+      ERR=0 ;;
+   t) TIT=1 ;;
+   \?) echo "argument invalide"
+      echo " "
+      ERR=0 ;;
+  esac
+done
+
+shift $(($OPTIND-1))
+
+if [ $# != 2 ]; then
+  ERR=0
+else
+  NF1=$1
+  NF2=$2
+  if [ -f $1 ]; then
+    NF1=$1
+  else
+    echo "$1 : ce fichier n'existe pas"
+    echo " "
+    ERR=0
+  fi
+  if [ ! -f ${2}.1.epsf ]; then
+    NF2=$2
+  else
+    echo "${2}.1.epsf existe deja, changez le \"rootname\""
+    echo " ou effacez les fichiers ${2}.NNN.epsf"
+    exit
+  fi
+fi
+
+if [ $ERR = 0 ]; then
+  echo "  Usage : castem2epsf [ -options... ] filename.ps rootname"
+  echo "Liste des options"
+  echo "   -b   : change le blanc en noir et le rose en orange*"
+  echo "   -g   : ne deplace pas la legende"
+  echo "   -l   : ne modifie pas la largeur des traits*"
+  echo "   -s N : change la taille du texte (par defaut, N=9)"
+  echo "   -t   : ne supprime pas le titre"
+  echo " "
+  echo " (*) ces options ne sont pas appliquees s'il y a des surfaces pleines."
+  echo " "
+  exit
+fi
+
+# job number pour les fichiers temporaires
+jn=$$
+
+# decoupage
+#echo " Decoupage de $NF1 en morceaux..."
+sed s/name_root/$NF2/g $CAS2PS_HOME/cut.awk > c2e.1.$jn
+sed s/prolog/prolog.$jn/g c2e.1.$jn > c2e.2.$jn
+last=`$GAWK_DIR/gawk -f c2e.2.$jn $NF1`
+/bin/rm -f c2e.1.$jn c2e.2.$jn
+if [ `wc -c ${NF2}.${last} | $GAWK_DIR/gawk '{print $1}'` = 20 ]; then 
+  echo "${NF2}.${last} est vide (issu de Castem)"
+  /bin/rm -f ${NF2}.${last}
+fi
+
+#integer counter
+counter=0
+
+#echo " Creation des fichiers EPSF..."
+for i in $NF2.[1-9]*
+do
+#  echo "${i}.epsf"
+  sed -e '$ d' $i > c2e.1.$jn
+  cat prolog.$jn c2e.1.$jn > c2e.io.$jn
+  /bin/rm -f $i c2e.1.$jn
+  
+#echo Supprime le titre
+  if [ $TIT = 0 ]; then
+    $GAWK_DIR/gawk 'BEGIN {tt=-999} {if (NF==5 && $1==0. && $2=="CX" && $3==0.\
+     && $4=="CX" && $5=="MX" && tt==-999) tt=NR; if (tt==-999 || NR > (tt + 1))\
+      print;}' c2e.io.$jn > c2e.1.$jn
+    /bin/mv -f c2e.1.$jn c2e.io.$jn
+  fi
+  
+#echo Deplace Legende
+  if [ $DEC = 0 ]; then
+    grep -n "27\.316" c2e.io.$jn > c2e.1.$jn
+    grep -n "27\.000" c2e.io.$jn >> c2e.1.$jn
+    lval=`sort -n -t ":" c2e.1.$jn | head -1 | $GAWK_DIR/gawk -F ":" '{print $1}'`
+    /bin/rm -f c2e.1.$jn
+
+    if [ "X"$lval != "X" ]; then
+#      echo "Légende à la ligne : $lval"
+      ntot=`wc -l c2e.io.$jn | $GAWK_DIR/gawk '{print $1}'`
+      head -$(($lval-1)) c2e.io.$jn > c2e.1.$jn
+      tail -$(($ntot-$lval+1)) c2e.io.$jn > c2e.9.$jn
+#      
+      sed s/"RESU"/"x2"/g $CAS2PS_HOME/rech_maxi.awk > c2e.2.$jn
+      x2=`$GAWK_DIR/gawk -f c2e.2.$jn c2e.1.$jn`
+      sed s/"RESU"/"x1"/g $CAS2PS_HOME/rech_maxi.awk > c2e.8.$jn
+      x3=`$GAWK_DIR/gawk -f c2e.8.$jn c2e.9.$jn`
+      dec=$(($x2-$x3+200))
+#      if [ $dec -gt 0 ]; then dec=0; fi
+      
+      sed s/"decalage"/$dec/g $CAS2PS_HOME/diff.awk > c2e.5.$jn
+
+      $GAWK_DIR/gawk -f c2e.5.$jn c2e.9.$jn >> c2e.1.$jn
+      /bin/mv -f c2e.1.$jn c2e.io.$jn
+      /bin/rm -f c2e.2.$jn c2e.5.$jn c2e.8.$jn c2e.9.$jn
+    #else
+     # echo " ${i}.epsf : pas d'isovaleur, deformee ou vecteur."
+    fi
+  fi
+  
+#echo Bounding Box
+  sed s/"RESU"/"bb"/g $CAS2PS_HOME/rech_maxi.awk > c2e.1.$jn
+  $GAWK_DIR/gawk -f c2e.1.$jn c2e.io.$jn > c2e.2.$jn
+  sed -f c2e.2.$jn c2e.io.$jn > c2e.3.$jn
+  /bin/mv -f c2e.3.$jn c2e.io.$jn
+  /bin/rm -f c2e.1.$jn c2e.2.$jn
+  
+# si pas de surfaces pleines
+  if [ `grep -c " DS" c2e.io.$jn` = 0 ]; then
+#echo Change le blanc en noir et le rose en orange (si pas de FILL)
+    if [ $BLA = 0 ]; then
+      sed s/"DE { 1.0000 1.0000 1.0000 setrgbcolor }"/"DE { 0.0000 0.0000 0.0000 setrgbcolor }"/g  c2e.io.$jn > c2e.1.$jn
+      sed s/"D2 { 1.0000 0.0000 1.0000 setrgbcolor }"/"D2 { 1.0000 0.6471 0.0000 setrgbcolor }"/g  c2e.1.$jn > c2e.2.$jn
+      /bin/mv -f c2e.2.$jn c2e.io.$jn
+      /bin/rm -f c2e.1.$jn
+    fi
+#echo Modifie l'épaisseur (si pas de FILL)
+    if [ $LIG = 0 ]; then
+      sed s/"0.1 setlinewidth"/"10. setlinewidth"/g c2e.io.$jn > c2e.1.$jn
+      /bin/mv -f c2e.1.$jn c2e.io.$jn
+    fi
+  fi
+  
+#echo Change la taille du texte
+#### la changement de taille devra etre pris en compte dans rech_maxi !!!
+  if [ $SIZ = 0 ]; then
+    sed s/"9 scalefont"/"$nn scalefont"/g c2e.io.$jn > c2e.1.$jn
+    /bin/mv -f c2e.1.$jn c2e.io.$jn
+  fi
+  
+# FIN
+  /bin/mv -f c2e.io.$jn ${i}.epsf
+  let counter=${counter}+1
+done
+/bin/rm -f prolog.$jn
+

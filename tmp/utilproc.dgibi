@@ -1,0 +1,1608 @@
+************************************************************************
+* NOM         : APPEND
+* DESCRIPTION : Rajoute :
+*               - un entier à un listentier
+*               - un réel   à un listreel
+*               - un objet (rigidité ou chpoint) à un indice de table
+*                    * si l'indice n'existe pas
+*                    * 'ET' si l'indice existe 
+*                
+*
+*
+* LANGAGE     : GIBIANE-CAST3M
+* AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SFME/LTMF)
+*               mél : gounand@semt2.smts.cea.fr
+**********************************************************************
+* VERSION    : v1, 10/09/2004, version initiale
+* HISTORIQUE : v1, 10/09/2004, création
+* HISTORIQUE :
+* HISTORIQUE :
+************************************************************************
+* Prière de PRENDRE LE TEMPS de compléter les commentaires
+* en cas de modification de ce sous-programme afin de faciliter
+* la maintenance !
+************************************************************************
+*
+*
+'DEBPROC' APPEND ;
+'ARGUMENT' tab/'TABLE' ;
+'SI' ('EXISTE' tab) ;
+   'ARGUMENT' itab*'MOT' ;
+   lobj = FAUX ;
+   'SI' ('NON' lobj) ;
+      'ARGUMENT' lr/'LISTREEL' ;
+      'SI' ('EXISTE' lr) ;
+         obj = lr ; lobj = VRAI ;
+      'FINSI' ;
+   'FINSI' ;               
+   'SI' ('NON' lobj) ;
+      'ARGUMENT' le/'LISTENTI' ;
+      'SI' ('EXISTE' le) ;
+         obj = le ; lobj = VRAI ;
+      'FINSI' ;
+   'FINSI' ;               
+   'SI' ('NON' lobj) ;
+      'ARGUMENT' chpo/'CHPOINT' ;
+      'SI' ('EXISTE' chpo) ;
+         obj = chpo ; lobj = VRAI ;
+      'FINSI' ;
+   'FINSI' ;               
+   'SI' ('NON' lobj) ;
+      'ARGUMENT' rig/'RIGIDITE' ;
+      'SI' ('EXISTE' rig) ;
+         obj = rig ; lobj = VRAI ;
+      'FINSI' ;
+   'FINSI' ;               
+   'SI' ('NON' lobj) ;
+      'ARGUMENT' matk/'MATRIK' ;
+      'SI' ('EXISTE' matk) ;
+         obj = matk ; lobj = VRAI ;
+      'FINSI' ;
+   'FINSI' ;
+   'SI' ('NON' lobj) ;
+      cherr = 'CHAINE'
+       'Il faut fournir un objet list chpoint ou matrice.' ; 
+      'ERREUR' cherr ;
+   'FINSI' ;      
+   'SI' ('EXISTE' tab itab) ;
+      tab . itab = 'ET' (tab . itab) obj ;
+   'SINON' ;
+      tab . itab = obj ;
+   'FINSI' ;
+   'RESPRO' tab ;      
+'FINSI' ;   
+'ARGUMENT' lenti/'LISTENTI' ;
+'ARGUMENT' lreel/'LISTREEL' ;
+'SI' ('EXISTE' lenti) ;
+   'ARGUMENT' enti*'ENTIER' ;
+   lenti = 'ET' lenti ('LECT' enti) ;
+   'RESPRO' lenti ;
+'FINSI' ;   
+'SI' ('EXISTE' lreel) ;
+   'ARGUMENT' reel*'FLOTTANT' ;
+   lreel = 'ET' lreel ('PROG' reel) ;
+   'RESPRO' lreel ;
+'FINSI' ;   
+*
+* End of procedure file APPEND
+*
+'FINPROC';
+*==================================================================
+* Calcul de la fonction de courant d'un domaine fermé
+*==================================================================
+* E/  : UN       : CHPO     : Champ de vitesse
+* E/  : $DOMAINE : MMODEL 'NAVIER_STOKES' volumique
+* E/  : $CONTOUR : MMODEL 'NAVIER_STOKES' surfacique
+*  /S : PSI      : CHPO     : Fonction de courant
+*------------------------------------------------------------------
+* On vérifie qu'on est en dimension 2 mais pas que div(UN)=0
+* Si le domaine est ouvert, modifier les conditions aux limites
+*------------------------------------------------------------------
+* F. Dabbene (CEA)
+*------------------------------------------------------------------
+'DEBPROC' courant un*chpoint $domaine*mmodel $contour*mmodel ;
+*
+   VAL0 = 'VALE' 'DIME' ;
+   TEST = 'EGA' VAL0 2 ;
+   'SI' TEST ;
+      'MESS' 'Remember that Velocity have to be at zero divergence' ;
+   'SINON' ;
+      'ERRE' 832 ;
+      'QUIT' courant ;
+   'FINSI' ;
+   VAL1 = 'VALE' 'MODE' ;
+   TEST = 'EGA' VAL1 'AXIS' ;
+   'SI' TEST ;
+      'MESSAGE' 'Mode axis pour la fonction de courant';
+      ROTU0   = 'KOPS' un 'ROT' $domaine ;
+      XC1 YC1 = 'COOR' ('DOMA' $domaine 'CENTRE') ;
+      VZ1     = 'NOEL' $domaine ('EXCO' un 'UY' 'SCAL') ;
+      ROTU0   = 2. * VZ1 '-' (ROTU0 * XC1) ;
+   'SINO' ;
+      ROTU0  = 'KOPS' un 'ROT' $domaine ;
+      'MESSAGE' 'Mode plan';
+   'FINSI' ; 
+   CONT0  = 'DOMA' $contour 'MAILLAGE' ;
+   RK = 'EQEX' $domaine 'OPTI' 'EF' 'IMPL'
+        'ZONE' $domaine 'OPER' 'LAPN' -1. 'INCO' 'PSI'
+        'ZONE' $domaine 'OPER' 'FIMP' ROTU0 'INCO' 'PSI'
+        'CLIM' 'PSI' 'TIMP' CONT0 0. ;
+   RK . 'INCO' = 'TABLE' 'INCO' ;
+   RK . 'INCO' . 'PSI' = 'KCHT' $domaine 'SCAL' 'SOMMET' 0. ;
+   EXEC RK ;
+   psi = 'COPI' RK . 'INCO' . 'PSI' ;
+'FINP' psi ;
+*****************************************
+* JELIS2D Procedure de lecture
+* d'un tableau Nx2  (separateur: espace)
+*
+'DEBPROC' JELIS2D nfic*mot npn*entier;
+*
+absz = table ;
+ordr = table ;
+*
+'OPTION' acqu nfic;
+*
+'REPETER' bloc3 npn;
+  i = &bloc3;
+  acqu a o;
+* en mm
+  absz.i = a;
+  ordr.i = o;
+'FIN' bloc3;
+*
+'RESPRO' absz ordr;
+*
+* Fin Procedure JELIS2D
+*
+'FINPROC' ;
+*
+**********************************
+* JECRI :  Procedure d'ecriture 01
+*
+'DEBPROC'  JECRI modefour*table modefreq*table freq*table 
+            nbh*entier ficout*mot;
+i=1;
+ii='VALEUR'  impr;
+'OPTION'  impr 10 impr ficout;
+'REPETER'  bou1 nbh;
+   mf1 = modefour.i;
+   mf2 = modefreq.i;
+   f = freq.i;
+   'MESSAGE'  ' Mode : ' mf1 ' - ' mf2 ' / Frequence = ' f 'Hz';
+  i = i + 1;
+'FIN'  bou1;
+'OPTION'  impr ii;
+*
+* Fin procedure JECRI
+*
+'FINPROC';
+*
+**********************************
+* JECRI2 : Procedure d'ecriture 02
+*
+'DEBPROC' JECRI2 temps*listreel freq*listreel nbh*entier ficout*mot;
+i=1;
+ii='VALEUR'  impr;
+'OPTION'  impr 10 impr ficout;
+'REPETER'  bou1 nbh;
+    f = 'EXTRAIRE'  freq i;
+    t = 'EXTRAIRE'  temps i;
+    'MESSAGE'  t f;
+  i = i + 1;
+'FIN'  bou1;
+'OPTION'  impr ii;
+*
+* Fin Procedure JECRI2
+*
+'FINPROC';
+*
+**********************************
+* JECRI3 : Procedure d'ecriture 03
+*
+'DEBPROC' JECRI3 freq*listreel nbh*entier ficout*mot;
+i=1;
+ii='VALEUR'  impr;
+'OPTION'  impr 10 impr ficout;
+'REPETER'  bou1 nbh;
+    f = 'EXTRAIRE'  freq i;
+    'MESSAGE'  f;
+  i = i + 1;
+'FIN'  bou1;
+'OPTION'  impr ii;
+*
+* Fin Procedure JECRI3
+*
+'FINPROC';
+*
+************************************************************************
+* NOM         : FORMAR
+* DESCRIPTION : formate un réel de facon courte
+*               pratique pour les noms de
+*               sauvegarde
+*               Exemples :
+* 'MESSAGE' ('CHAINE' (formar 2.9e5   1)) ;
+* 2.9E5
+* 'MESSAGE' ('CHAINE' (formar -2.9e5  1)) ;
+* -2.9E5
+* 'MESSAGE' ('CHAINE' (formar 2.9e-5  1)) ;
+* 2.9E-5
+* 'MESSAGE' ('CHAINE' (formar -2.9e-5 1)) ;
+* -2.9E-5
+* 'MESSAGE' ('CHAINE' (formar 2.9     1)) ;
+* 2.9
+* 'MESSAGE' ('CHAINE' (formar -2.9    1)) ;
+* -2.9
+* 'MESSAGE' ('CHAINE' (formar 0       1)) ;
+* 0
+* 'MESSAGE' ('CHAINE' (formar 0       1)) ;
+* 0
+* 'MESSAGE' ('CHAINE' (formar 2.9e5   0)) ;
+* 3E5
+* 'MESSAGE' ('CHAINE' (formar -2.9e5  0)) ;
+* -3E5
+* 'MESSAGE' ('CHAINE' (formar 2.9e-5  0)) ;
+* 3E-5
+* 'MESSAGE' ('CHAINE' (formar -2.9e-5 0)) ;
+* -3E-5
+* 'MESSAGE' ('CHAINE' (formar 2.9     0)) ;
+* 3
+* 'MESSAGE' ('CHAINE' (formar -2.9    0)) ;
+* -3
+* 'MESSAGE' ('CHAINE' (formar 0       0)) ;
+* 0
+* 'MESSAGE' ('CHAINE' (formar 0       0)) ;
+* 0
+*               
+*
+*
+* LANGAGE     : GIBIANE-CAST3M
+* AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SFME/LTMF)
+*               mél : gounand@semt2.smts.cea.fr
+**********************************************************************
+* VERSION    : v1, 18/02/2003, version initiale
+* HISTORIQUE : v1, 18/02/2003, création
+* HISTORIQUE :
+* HISTORIQUE :
+************************************************************************
+* Prière de PRENDRE LE TEMPS de compléter les commentaires
+* en cas de modification de ce sous-programme afin de faciliter
+* la maintenance !
+************************************************************************
+*
+*
+'DEBPROC' FORMAR ;
+'ARGUMENT' fl*'FLOTTANT' ;
+'ARGUMENT' vir/'ENTIER  ' ;
+'SI' ('NON' ('EXISTE' vir)) ;
+   vir = 1 ;
+'SINON' ;   
+   'SI' ('<' vir 0) ;
+      'ERREUR' 'fournir un entier positif' ;
+   'FINSI' ;
+'FINSI' ;         
+'SI' ('<' ('ABS' fl) 10.D-100) ;
+   chfl = 'CHAINE' '0' ;
+'SINON' ;
+*! sans le 1.D-10, ca ne fonctionne pas
+*! qd on entre pile poil une puissance de 10
+*!   lfl = LOG10 ('ABS' fl) ;
+   lfl = '+' (LOG10 ('ABS' fl)) 1.D-10  ;
+   slfl = 'SIGNE' ('ENTIER' lfl) ;
+   'SI' ('EGA' slfl 1) ;
+      elfl = 'ENTIER' lfl ;
+   'SINON' ;
+      elfl = '-' ('ENTIER' lfl) 1 ;
+   'FINSI' ;
+   man = '/' fl ('**' 10.D0 elfl) ;
+   sman = 'SIGNE' man ;
+   'SI' ('EGA' sman 1) ;   
+      fman = 'CHAINE' '(F' ('+' vir 2) '.0' vir ')' ;
+   'SINON' ;
+      fman = 'CHAINE' '(F' ('+' vir 3) '.0' vir ')' ;
+   'FINSI' ;
+   'SI' ('NEG' vir 0) ;   
+      'SI' ('NEG' elfl 0) ;
+         chfl = 'CHAINE' 'FORMAT' fman man 'E' elfl ;
+      'SINON' ;
+         chfl = 'CHAINE' 'FORMAT' fman man ;
+      'FINSI' ;
+   'SINON' ;
+      man2 = 'ENTIER' ('+' man ('*' 0.5D0 sman)) ;
+      'SI' ('NEG' elfl 0) ;
+         chfl = 'CHAINE' man2 'E' elfl ;
+      'SINON' ;
+         chfl = 'CHAINE' man2 ;
+      'FINSI' ;
+   'FINSI' ;            
+'FINSI' ;   
+'RESPRO' chfl ;
+*
+* End of procedure file FORMAR
+*
+'FINPROC';
+freq = 60 ;
+****************************************************************
+* NOM         : HOWE
+* DESCRIPTION : calcule le champ vectoriel [(rot u) x u] correspondant aux sources
+* 				de bruit selon la formulation de Howe :
+*     				 _
+* 				P = /  [(rot u) x u].u_ac dV
+*  				   -V
+*
+* LANGAGE     : GIBIANE-CAST3M
+* AUTEURS     : Guillaume PELLERIN (UPMC/LAM)
+*               pellerin at ccr.jussieu.fr
+*
+* (procédure incluse dans Castax)
+*
+* Copyright 2005 (C) by Guillaume Pellerin <pellerin@ccr.jussieu.fr>
+*
+* Ce logiciel est régi par la licence CeCILL soumise au droit français et
+* respectant les principes de diffusion des logiciels libres. Vous pouvez
+* utiliser, modifier et/ou redistribuer ce programme sous les conditions
+* de la licence CeCILL telle que diffusée par le CEA, le CNRS et l'INRIA 
+* sur le site "http://www.cecill.info".
+* 
+* En contrepartie de l'accessibilité au code source et des droits de copie,
+* de modification et de redistribution accordés par cette licence, il n'est
+* offert aux utilisateurs qu'une garantie limitée. Pour les mêmes raisons,
+* seule une responsabilité restreinte pèse sur l'auteur du programme, le
+* titulaire des droits patrimoniaux et les concédants successifs.
+* 
+* A cet égard l'attention de l'utilisateur est attirée sur les risques
+* associés au chargement, à l'utilisation, à la modification et/ou au
+* développement et à la reproduction du logiciel par l'utilisateur étant 
+* donné sa spécificité de logiciel libre, qui peut le rendre complexe à 
+* manipuler et qui le réserve donc à des développeurs et des professionnels
+* avertis possédant des connaissances informatiques approfondies. Les
+* utilisateurs sont donc invités à charger et tester l'adéquation du
+* logiciel à leurs besoins dans des conditions permettant d'assurer la
+* sécurité de leurs systèmes et ou de leurs données et, plus généralement, 
+* à l'utiliser et l'exploiter dans les mêmes conditions de sécurité. 
+* 
+* Le fait que vous puissiez accéder à cet en-tête signifie que vous avez 
+* pris connaissance de la licence CeCILL, et que vous en avez accepté les
+* termes.
+*
+**********************************************************************
+* ARGUMENT : matab : champ de vitesse issu d'un calcul NS
+*			 mondom : domaine de type mmodel associé à matab
+*
+***********************************************************************
+* Prière de PRENDRE LE TEMPS de compléter les commentaires
+* en cas de modification de ce sous-programme afin de faciliter
+* la maintenance !
+***********************************************************************
+*
+'DEBPROC' HOWE ;
+'ARGUMENT' matab*CHPOINT $modom*MMODEL;
+*
+rotu = 'KOPS' matab 'ROT' $modom;
+*opti mode plan;
+rotu = 'ELNO'  $modom ('KCHT' $modom SCAL CENTRE rotu) CENTRE;
+*opti mode axis;
+howo = rotu '*' matab;
+*
+'RESPRO' howo;
+*
+'FINPROC';
+*************************************************************************
+* NOM         : ISELECT
+* DESCRIPTION : génère une liste de ni entiers
+*               régulièrement espacés entre ideb et ifin
+*               inclus
+*
+* LANGAGE     : GIBIANE-CAST3M
+* AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SFME/LTMF)
+*               mél : gounand@semt2.smts.cea.fr
+**********************************************************************
+* VERSION    : v1, 14/05/2004, version initiale
+* HISTORIQUE : v1, 14/05/2004, création
+* HISTORIQUE :
+* HISTORIQUE :
+************************************************************************
+* Prière de PRENDRE LE TEMPS de compléter les commentaires
+* en cas de modification de ce sous-programme afin de faciliter
+* la maintenance !
+************************************************************************
+*
+*
+'DEBPROC' ISELECT ;
+'ARGUMENT' ideb*'ENTIER  ' ;
+'ARGUMENT' ifin*'ENTIER  ' ;
+'ARGUMENT'   ni*'ENTIER  ' ;
+'ARGUMENT' imin/'ENTIER  ' ;
+'ARGUMENT' imax/'ENTIER  ' ;
+'SI' ('EXISTE' imin) ;
+   'SI' ('<' ideb imin) ;
+      cherr = 'CHAINE' 'ideb=' ideb ' < imin=' imin ;
+      'ERREUR' cherr ;
+   'FINSI' ;
+'FINSI' ;         
+'SI' ('EXISTE' imax) ;
+   'SI' ('>' ifin imax) ;
+      cherr = 'CHAINE' 'ifin=' ifin ' > imax=' imax ;
+      'ERREUR' cherr ;
+   'FINSI' ;
+'FINSI' ;
+*
+'SI' ('<' ni 2) ;
+   cherr = 'CHAINE' 'Erreur :'
+     ' ni=' ni ' < 2' ;
+   'ERREUR' cherr ;
+'FINSI' ;   
+*
+lisel = 'LECT' ;
+'REPETER' ii ni ;
+   pif = '/' ('FLOTTANT' ('-' &ii 1)) ('FLOTTANT' ('-' ni 1)) ;
+   pid = '-' 1.D0 pif ;
+   im = '+' ('*' pid ('FLOTTANT' ideb))
+            ('*' pif ('FLOTTANT' ifin)) ;
+   lisel = 'ET' lisel ('LECT' ('ENTIER' ('+' im 0.5D0))) ;
+'FIN' ii ;
+'RESPRO' lisel ;
+*
+* End of procedure file ISELECT
+*
+'FINPROC';
+************************************************************************
+* NOM         : LOG10
+* DESCRIPTION : Log_10
+*
+*
+*
+* LANGAGE     : GIBIANE-CAST3M
+* AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SFME/LTMF)
+*               mél : gounand@semt2.smts.cea.fr
+**********************************************************************
+* VERSION    : v1, 18/02/2003, version initiale
+* HISTORIQUE : v1, 18/02/2003, création
+* HISTORIQUE :
+* HISTORIQUE :
+************************************************************************
+* Prière de PRENDRE LE TEMPS de compléter les commentaires
+* en cas de modification de ce sous-programme afin de faciliter
+* la maintenance !
+************************************************************************
+*
+*
+'DEBPROC' LOG10 ;
+'ARGUMENT' fl/'FLOTTANT' ;
+'ARGUMENT' lr/'LISTREEL' ;
+'ARGUMENT' cp/'CHPOINT ' ;
+'ARGUMENT' cm/'MCHAML  ' ;
+'SI' ('EXISTE' fl) ;
+   'RESPRO' ('/' ('LOG' fl) ('LOG' 10.D0)) ;
+'FINSI' ;
+'SI' ('EXISTE' lr) ;
+   'RESPRO' ('/' ('LOG' lr) ('LOG' 10.D0)) ;
+'FINSI' ;
+'SI' ('EXISTE' cp) ;
+   'RESPRO' ('/' ('LOG' cp) ('LOG' 10.D0)) ;
+'FINSI' ;
+'SI' ('EXISTE' cm) ;
+   'RESPRO' ('/' ('LOG' cm) ('LOG' 10.D0)) ;
+'FINSI' ;
+*
+* End of procedure file LOG10
+*
+'FINPROC';
+profil ='tuy25.2527.geo';
+* ************************************************************************
+* NOM         : RENP
+* DESCRIPTION : extrait les données de pression, vitesse des tables de
+*		résultats de Castax aux capteurs préalablement définis
+*		(micXX), sur l'axe de symétrie, sur la paroi, ainsi que le
+*		frottement à la paroi
+*
+* LANGAGE     : GIBIANE-CAST3M
+*
+* AUTEUR      : Guillaume PELLERIN (UPMC/LAM)
+*               <pellerin at ccr.jussieu.fr>
+*
+* CONTRIBUTEURS: Nicolas QUAEGEBEUR (ENSTA)
+*                <nicoq at aol.com>
+*                Pierre-Yves LAGREE (UPMC/LMM)
+*                <pyl at lmm.jussieu.fr>
+*
+* Ce fichier fait partie du logiciel Castax
+*
+* Copyright 2005 (C) by Guillaume Pellerin <pellerin@ccr.jussieu.fr>
+*
+* Ce logiciel est régi par la licence CeCILL soumise au droit français et
+* respectant les principes de diffusion des logiciels libres. Vous pouvez
+* utiliser, modifier et/ou redistribuer ce programme sous les conditions
+* de la licence CeCILL telle que diffusée par le CEA, le CNRS et l'INRIA 
+* sur le site "http://www.cecill.info".
+* 
+* En contrepartie de l'accessibilité au code source et des droits de copie,
+* de modification et de redistribution accordés par cette licence, il n'est
+* offert aux utilisateurs qu'une garantie limitée. Pour les mêmes raisons,
+* seule une responsabilité restreinte pèse sur l'auteur du programme, le
+* titulaire des droits patrimoniaux et les concédants successifs.
+* 
+* A cet égard l'attention de l'utilisateur est attirée sur les risques
+* associés au chargement, à l'utilisation, à la modification et/ou au
+* développement et à la reproduction du logiciel par l'utilisateur étant 
+* donné sa spécificité de logiciel libre, qui peut le rendre complexe à 
+* manipuler et qui le réserve donc à des développeurs et des professionnels
+* avertis possédant des connaissances informatiques approfondies. Les
+* utilisateurs sont donc invités à charger et tester l'adéquation du
+* logiciel à leurs besoins dans des conditions permettant d'assurer la
+* sécurité de leurs systèmes et ou de leurs données et, plus généralement, 
+* à l'utiliser et l'exploiter dans les mêmes conditions de sécurité. 
+* 
+* Le fait que vous puissiez accéder à cet en-tête signifie que vous avez 
+* pris connaissance de la licence CeCILL, et que vous en avez accepté les
+* termes.
+*************************************************************************
+*
+'DEBPROC' RENP;
+'ARGUMENT' matab*'TABLE';
+'ARGUMENT' tabind/'ENTIER';
+*
+pn = matab.PRESSIONS.tabind;
+vn = matab.VITESSES.tabind;
+*
+********************************
+* Pression/Vitesse aux capteurs
+*
+* pression/vitesse axiales entree
+ps00 ='EXTRAIRE' pn SCAL mic00;
+vs00 = 'EXTRAIRE' vn UY mic00;
+*
+* micros radiaux
+ps01 ='EXTRAIRE'  pn SCAL mic01;
+ps03 ='EXTRAIRE'  pn SCAL mic03;
+ps05 ='EXTRAIRE'  pn SCAL mic05;
+ps07 ='EXTRAIRE'  pn SCAL mic07;
+*
+* pression/vitesse axiales en sortie
+ps10 ='EXTRAIRE'  pn SCAL mic10;
+vs10 = 'EXTRAIRE' vn UY mic10;
+*
+* pression/vitesse axiales 5 cm de la sortie
+ps11 ='EXTRAIRE'  pn SCAL mic11;
+vs11 ='EXTRAIRE' vn UY mic11;
+*
+* pression/vitesse axiales en dehors du jet
+ps12 ='EXTRAIRE'  pn SCAL mic12;
+vs12 ='EXTRAIRE' vn UY mic12;
+*
+*************
+* Impedances
+*
+* Zray
+'SI' (> vs10 0.0);
+Zray=ps10/vs10;
+'FINSI' ;
+* Zentree
+SI (> vs00 0.0);
+Ze=ps00/vs00;
+FINSI;
+*
+************************************
+* Pression parois/axe/ et Frottement
+* Auteur: N. Quaegebeur
+*** abs curvilignes de l'axe et la paroi
+EVOPS=evol CHPO (coord 2 haut) haut;
+EVOWS=evol CHPO (coord 2 wallt) wallt;
+UYY=exco 'UY' vn 'UY';
+*
+*** pression sur l'axe
+PP=INT_COMP mt pn haut;
+EVOPP=(evol CHPO PP haut);
+Preaxe=EVOL MANU (EXTR EVOPS ORDO) (EXTR EVOPP ORDO);
+*pmax=2*pi*f1*ro*umax;
+pmax='MAXIMUM' PP;
+*dess Preaxe 'TITRE' 'Pression sur axe' YBOR (-1*pmax-0.1) (pmax+0.1);
+*
+*** vitesse sur l'axe
+PP2=INT_COMP mt UYY haut;
+vmax = 'MAXIMUM'  PP2;
+EVOPP2=(evol CHPO PP2 haut);
+Vitaxe=EVOL MANU (EXTR EVOPS ORDO) (EXTR EVOPP2 ORDO);
+*dess Vitaxe TITR 'Uy sur axe' YBOR (-1*vmax) vmax;
+*
+*** Intensite sur l'axe
+I=UYY*PP;
+II=INT_COMP mt I haut;
+imax = 'MAXIMUM' II;
+EVOI=evol CHPO II haut;
+Intaxe=EVOL MANU (EXTR EVOPS ORDO) (EXTR EVOI ORDO);
+*dess Intaxe TITR 'Intensite acoustique sur axe' YBOR (-1*imax) imax;
+*
+*** Frottement sur la paroi - on calcule ici dUy/dy
+* Auteur: P.-Y. Lagrée 
+Uxdey= kcht $mt scal sommet (exco 'UY' vn);
+GRADU = KOPS Uxdey 'GRAD' $mt;
+DUDY = KCHT $mt 'SCAL' 'CENTRE' (EXCO 'UX' GRADU);
+DUDY = ELNO $mt DUDY;
+DUDY = KOPS DUDY '*' (-1.);
+EVDUDY = EVOL 'CHPO' DUDY SCAL wallt;
+Taupar=EVOL MANU (EXTR EVOWS ORDO) (EXTR EVDUDY ORDO);
+*dess Taupar 'TITR' 'Frottement Parietal';
+*
+**pression paroi
+PP=INT_COMP mt pn wallt;
+maxp = 'MAXIMUM' PP;
+EVOPP=(evol CHPO PP wallt);
+Prepar=EVOL MANU (EXTR EVOWS ORDO) (EXTR EVOPP ORDO);
+*dess Prepar TITR 'P paroi' YBOR (-1*maxp) maxp;
+*
+*******************
+* Pressions et vitesses a l'entree, la sortie, au col
+*
+* entree
+* pres
+*
+*
+EVOPS = 'EVOL' 'CHPO' (coord 1 entree) entree;
+*
+PP=INT_COMP mt pn entree;
+EVOPP=(evol CHPO PP entree);
+p_ent=EVOL MANU (EXTR EVOPS ABS) (EXTR EVOPP ORDO);
+* vit
+*
+PV=INT_COMP mt UYY entree;
+EVOPV = (evol CHPO PV entree);
+v_ent=EVOL MANU (EXTR EVOPS ABS) (EXTR EVOPV ORDO);
+*
+* sortie
+*
+* pres
+EVOPS = 'EVOL' 'CHPO' (coord 1 sortie) sortie;
+*
+PP=INT_COMP mt pn sortie;
+EVOPP=(evol CHPO PP sortie);
+p_sor=EVOL MANU (EXTR EVOPS ABS) (EXTR EVOPP ORDO);
+*
+* vit
+PV=INT_COMP mt UYY sortie;
+EVOPV=(evol CHPO PV sortie);
+v_sor=EVOL MANU (EXTR EVOPS ABS) (EXTR EVOPV ORDO);
+*
+* col
+EVOPS = 'EVOL' 'CHPO' (coord 1 col) col;
+*
+* press
+PP=INT_COMP mt pn col;
+EVOPP=(evol CHPO PP col);
+p_col=EVOL MANU (EXTR EVOPS ABS) (EXTR EVOPP ORDO);
+*
+* vit
+PV=INT_COMP mt UYY col;
+EVOPV=(evol CHPO PV col);
+v_col=EVOL MANU (EXTR EVOPS ABS) (EXTR EVOPV ORDO);
+*v_col=1;
+*
+RESPROC ps00 ps01 ps03 ps05 ps07 ps10 ps11 ps12 vs00
+vs10 vs11 vs12 Zray Ze preaxe vitaxe intaxe taupar prepar
+p_ent v_ent p_sor v_sor p_col v_col;
+*
+'FINPROC';
+*
+*==================================================================
+* Calcul du résidu en pression et arrêt suivant un critère
+*==================================================================
+* E/  : RVX      : TABLE     : TABLE des données créées par EQEX
+*                  ARG1      : Fréquence d'impression
+*                  ARG2      : Critère d'arrêt
+*  /S : MAT1     : MATRIK    : Objet vide
+*  /S : CHP1     : CHPO      : Objet vide
+*------------------------------------------------------------------
+* Auteur: F. DABBENE
+* adapté par G. PELLERIN
+*------------------------------------------------------------------
+'DEBPROC' residu rvx*table ;
+   RV   = rvx . 'EQEX' ;
+   FREQ = RVX . 'ARG1' ;
+   EPS0 = RVX . 'ARG2' ;
+   NITER = RV . 'NITER' ;
+   DD = RV . 'PASDETPS' . 'NUPASDT' ;
+   NN = DD '/' FREQ ;
+   L0 = 'EGA' (DD '-' (FREQ*NN)) 0 ;
+   'SI' L0 ;
+      RANG0 = RV . 'PASDETPS' . 'NUPASDT' ;
+      TIME0 = RV . 'PASDETPS' . 'TPS' ;
+      TN0   = RV . 'INCO' . 'PN'  ;
+      TNM0  = RV . 'INCO' . 'PN2' ;
+      'SI' ('EGA' ('MAXIMUM' 'ABS' TN0) 0.0);
+      ERR0  = ('MAXIMUM' ('ABS' (TN0 '-' TNM0))) '+' 1.D-20;
+      'SINON';
+      ERR0  = (('MAXIMUM' ('ABS' (TN0 '-' TNM0))) '+' 1.D-20) '/'
+               ('MAXIMUM' 'ABS' TN0) ;
+      'FINSI' ;
+      ERR10 = ('LOG' ERR0 ) '/' ('LOG' 10.) ;
+      tty1 = 'CHAINE' 'Pas de temps : ' RANG0 ' (' TIME0 's)';
+      tty2 = 'CHAINE' 'Erreur relative max sur P:'
+         '10^(' ERR10 ')=' ERR0;
+*'MESSAGE' tty1;
+      'MESSAGE' tty2;
+      RV . 'INCO' . 'IT'  = RV . 'INCO' . 'IT' 'ET' ('PROG' RANG0) ;
+      RV . 'INCO' . 'TI'  = RV . 'INCO' . 'TI' 'ET' ('PROG' TIME0) ;
+      RV . 'INCO' . 'ER'  = RV . 'INCO' . 'ER' 'ET' ('PROG' ERR10) ; 
+      EV1 = 'EVOL' 'MANUEL' (RV . 'INCO' . 'IT') (RV . 'INCO' . 'ER') ;
+      Y1 = ('LOG' EPS0) '/' ('LOG' 10) ;
+      'SI' POST1 ;
+           X1 = 0. ; X2 = RV . 'ITMA' ;
+          'DESSIN' EV1 'YBOR' Y1 0. 'NCLK' ;
+      'FINSI' ;
+      'SI' POST2 ;
+           L1 = (PROG 10. PAS 5. 90.)* 1.D-3 ;
+           trace L1 tn0 mt cgeo 'TITR' 'Pression' 'NCLK' ;
+      'FINSI' ;
+      'SI' ((ERR10 < Y1) 'ET' (DD > 10)) ;
+         RV . 'TFINAL' = RV . 'PASDETPS' . 'TPS' ;
+      'FINSI' ;
+   'FINSI' ;
+   RV . 'INCO' . 'PN2' = 'COPIER' RV . 'INCO' . 'PN' ;
+   mat1 chp1 = 'KOPS' 'MATRIK' ;
+'FINP' mat1 chp1 ;
+*------------------------------------------------------------------
+****************************************************************
+* NOM         : TRAX
+* DESCRIPTION : calcule la trajectoire d'une particule à partir des données
+*               de vitesse depuis castax
+*
+* LANGAGE     : GIBIANE-CAST3M
+* AUTEUR      : Guillaume PELLERIN (UPMC/LAM)
+*               pellerin at ccr.jussieu.fr
+*
+* Copyright 2005 (C) by Guillaume Pellerin <pellerin@ccr.jussieu.fr>
+*
+* Ce logiciel est régi par la licence CeCILL soumise au droit français et
+* respectant les principes de diffusion des logiciels libres. Vous pouvez
+* utiliser, modifier et/ou redistribuer ce programme sous les conditions
+* de la licence CeCILL telle que diffusée par le CEA, le CNRS et l'INRIA 
+* sur le site "http://www.cecill.info".
+* 
+* En contrepartie de l'accessibilité au code source et des droits de copie,
+* de modification et de redistribution accordés par cette licence, il n'est
+* offert aux utilisateurs qu'une garantie limitée. Pour les mêmes raisons,
+* seule une responsabilité restreinte pèse sur l'auteur du programme, le
+* titulaire des droits patrimoniaux et les concédants successifs.
+* 
+* A cet égard l'attention de l'utilisateur est attirée sur les risques
+* associés au chargement, à l'utilisation, à la modification et/ou au
+* développement et à la reproduction du logiciel par l'utilisateur étant 
+* donné sa spécificité de logiciel libre, qui peut le rendre complexe à 
+* manipuler et qui le réserve donc à des développeurs et des professionnels
+* avertis possédant des connaissances informatiques approfondies. Les
+* utilisateurs sont donc invités à charger et tester l'adéquation du
+* logiciel à leurs besoins dans des conditions permettant d'assurer la
+* sécurité de leurs systèmes et ou de leurs données et, plus généralement, 
+* à l'utiliser et l'exploiter dans les mêmes conditions de sécurité. 
+* 
+* Le fait que vous puissiez accéder à cet en-tête signifie que vous avez 
+* pris connaissance de la licence CeCILL, et que vous en avez accepté les
+* termes.
+*************************************************************************
+*
+* Usage:
+* TRAX matab n_rayon res_ray n_long res_long
+* 
+* ARGUMENTS:
+* matab : table des résultats en vitesse
+* n_rayon : nombre de particules sur le rayon (r)
+* res_ray : nombre de points de définition du maillage selon le rayon (r)
+* n_long : nombre de groupes de particules sur la longueur (z)
+* res_long : nombre de points de définition du maillage selon la longueur (z)
+* pdt : pas de temps
+*
+* Le conduit est donc divisé en (n_long+1) parties de nombre de mailles
+* identique. La croix désigne la point de départ, le carré l'arrivée.
+*
+***********************************************************************
+* Prière de PRENDRE LE TEMPS de compléter les commentaires
+* en cas de modification de ce sous-programme afin de faciliter
+* la maintenance !
+***********************************************************************
+*
+* Calcul des trajectoires
+*
+'DEBPROC' TRAX;
+'ARGUMENT' matab*TABLE     ;
+'ARGUMENT' n_rayon*ENTIER  ;
+'ARGUMENT' res_ray*ENTIER  ;
+'ARGUMENT' n_long*ENTIER   ;
+'ARGUMENT' res_long*ENTIER ;
+'ARGUMENT' pdt*FLOTTANT    ;
+*
+*'OPTION' 'DIME' 2 'ELEM' QUA8 'MODE' 'AXIS' ;
+* matab: table des vitesses
+
+tt = matab;
+nitmas = 'DIME' tt ;
+nr =  n_rayon;
+nz =  n_long;
+rry = res_ray;
+rlg = res_long;
+pdtt = pdt;
+
+dr = 'ENTIER' ('/' ('-' rry 1) nr);
+dz = 'ENTIER' ('/' rlg nz);
+
+capt.'m1_x' = 'TABLE' ;
+capt.'m1_y' = 'TABLE' ;
+
+
+'REPETER' iitmz nz;
+
+ 'REPETER' iitmr nr;
+
+  pm1=('/'('*' ord.('*' dz &iitmz) &iitmr) nr) absi.('*' dz &iitmz);
+
+  itcous = 0;
+  m1xy = mt 'POIN' 'PROC' pm1 ;
+  m1x m1y = 'COORDONNEE' m1xy;
+  capt.'m1_x'.itcous = m1x ;
+  capt.'m1_y'.itcous = m1y ;
+  m1x_old = capt.'m1_x'.itcous;
+  m1y_old = capt.'m1_y'.itcous;
+  pmi_old = m1x_old m1y_old;
+*
+        croix1 = 'DROI' 1 (('-' m1x 0.001) ('+' m1y 0.001))
+               (('+' m1x 0.001) ('-' m1y 0.001));
+        croix2 = 'DROI' 1 (('-' m1x 0.001) ('-' m1y 0.001))
+               (('+' m1x 0.001) ('+' m1y 0.001));
+        chem_1 = ('ET' croix1 croix2);
+
+ 'REPETER' iitmas nitmas;
+
+* 'MESSAGE' nitmas;
+* 'MESSAGE' &iitmas;
+* 'MESSAGE' &iitmz;
+* 'MESSAGE' &iitmr;
+
+  'SI' ('ET'  ('NON' ('EGA' nitmas 1)) ('NON' ('EGA' &iitmas 1)));
+   m1x_old = capt.'m1_x'.('-' itcous 1);
+   m1y_old = capt.'m1_y'.('-' itcous 1);
+   pmi_old = m1x_old m1y_old;
+   'FINSI' ;
+   
+* Calcul des vitesses
+   vx1 = 'EXTRAIRE'  tt.itcous 'UX' m1xy;
+   vy1 = 'EXTRAIRE'  tt.itcous 'UY' m1xy;
+*
+   m1x = '+' m1x_old ('*' vx1  pdtt);
+   m1y = '+' m1y_old ('*' vy1  pdtt);
+
+   pmii = m1x m1y;
+   m1xy = mt 'POIN' proc pmii ;
+   m1x m1y = 'COORDONNEE' m1xy;
+   capt.'m1_x'.itcous = m1x;
+   capt.'m1_y'.itcous = m1y;
+
+*   'SI' ('NON' ('EGA' &iitmas 1));
+        chem_1 = 'ET' chem_1 ('DROI' 1 pmi_old m1xy) ;
+*   'FINSI' ;
+
+   'SI' ('EGA' &iitmas nitmas);
+     car1 = 'DROI' 1 (('-' m1x 0.001) ('-' m1y 0.001))
+               (('-' m1x 0.001) ('+' m1y 0.001));
+     car2 = 'DROI' 1 (('-' m1x 0.001) ('+' m1y 0.001))
+               (('+' m1x 0.001) ('+' m1y 0.001));
+     car3 = 'DROI' 1 (('+' m1x 0.001) ('+' m1y 0.001))
+               (('+' m1x 0.001) ('-' m1y 0.001));
+     car4 = 'DROI' 1 (('+' m1x 0.001) ('-' m1y 0.001))
+               (('-' m1x 0.001) ('-' m1y 0.001));
+     chem_1 = car1 'ET' car2 'ET' car3 'ET' car4 'ET' chem_1 ;
+    'FINSI' ;
+
+    itcous = '+' itcous 1;
+    
+   'FIN' iitmas ;
+
+  'SI' ('EGA' &iitmr 1);
+   chemr = chem_1;
+  'SINON' ;
+   chemr = chemr 'ET' chem_1;
+  'FINSI';
+
+ 'FIN' iitmr;
+
+ 'SI' ('EGA' &iitmz 1);
+   chemz = chemr;
+ 'SINON' ;
+   chemz = chemz 'ET' chemr;
+ 'FINSI';
+
+'FIN' iitmz;
+
+chemz = 'ET' chemz cgeo;
+
+'RESPRO' chemz;
+
+* Fin Procedure TRAX
+*
+'FINPROC' ;
+*
+************************************************************************
+* NOM         : TRCHPO
+* DESCRIPTION : Trace un ou deux chpoints
+*
+*
+*
+* LANGAGE     : GIBIANE-CAST3M
+* AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SFME/LTMF)
+*               mél : gounand@semt2.smts.cea.fr
+**********************************************************************
+* VERSION    : v1, 06/09/2004, version initiale
+* HISTORIQUE : v1, 06/09/2004, création
+* HISTORIQUE :
+* HISTORIQUE :
+************************************************************************
+* Prière de PRENDRE LE TEMPS de compléter les commentaires
+* en cas de modification de ce sous-programme afin de faciliter
+* la maintenance !
+************************************************************************
+*
+*
+'DEBPROC' TRCHPO ;
+'ARGUMENT' mt*'MAILLAGE' ;
+lt = 0 ; lv = 0 ;
+* Lecture des arguments
+'ARGUMENT' ch1*'CHPOINT' ;
+lcom1  = 'EXTRAIRE' ch1 'COMP' ;
+nlcom1 = 'DIME' lcom1 ;
+'SI' ('EGA' nlcom1 1) ;
+   lt = 1 ;
+   cht = ch1 ;
+   'ARGUMENT' minmaxt/'LISTREEL' ;
+'FINSI' ;      
+'SI' ('OU' ('EGA' nlcom1 2) ('EGA' nlcom1 0)) ;
+   lv = 1 ;
+   chv = ch1 ;
+   'ARGUMENT' maxv/'FLOTTANT' ;
+'FINSI' ;      
+'ARGUMENT' ch2/'CHPOINT' ;
+'SI' ('EXISTE' ch2) ;
+   lcom2  = 'EXTRAIRE' ch2 'COMP' ;
+   nlcom2 = 'DIME' lcom2 ;
+   'SI' ('ET' ('EGA' nlcom2 1) ('EGA' lt 0)) ;
+      lt = 2 ;
+      cht = ch2 ;
+      'ARGUMENT' minmaxt/'LISTREEL' ;
+   'FINSI' ;      
+   'SI'  ('ET' ('OU' ('EGA' nlcom2 2) ('EGA' nlcom2 0))
+               ('EGA' lv 0)) ;
+      lv = 2 ;
+      chv = ch2 ;
+      'ARGUMENT' maxv/'FLOTTANT' ;
+   'FINSI' ;
+'FINSI' ;   
+*
+'ARGUMENT' tit/'MOT     ' ;
+'SI' ('NON' ('EXISTE' tit)) ;
+   tit = 'CHAINE' 't=' (formar t 3) ' s' ;
+'FINSI' ;   
+*
+'ARGUMENT' lnclk/'LOGIQUE' ;
+*
+*
+* Détermination de l'échelle des pressions
+*
+'SI' ('NEG' lt 0) ;
+   'SI' ('EXISTE' minmaxt) ;
+      mint = 'EXTRAIRE' minmaxt 1 ;
+      maxt = 'EXTRAIRE' minmaxt 2 ;
+   'SINON' ;
+      mint = 'MINIMUM' cht ;   
+      maxt = 'MAXIMUM' cht ;   
+   'FINSI' ;
+   'SI' ('EGA' mint maxt ('*' 1.D-6 maxt)) ;
+      maxt = '+' mint 1. ;
+   'FINSI' ;
+   nbisov = 25 ;
+   past = '/' ('-' maxt mint) ('FLOTTANT' nbisov) ;
+   echsca = 'PROG' mint PAS past NPAS nbisov ;
+'FINSI' ;
+*
+* Détermination de l'échelle de vitesses
+*
+'SI' ('NEG' lv 0) ;
+   'SI' ('NON' ('EXISTE' maxv)) ;
+      maxv = 'MAXIMUM' chv 'ABS' ;
+   'FINSI' ;
+   'SI' ('<' maxv 1.D-6) ;
+      maxv = 1.D0 ;
+   'FINSI' ;
+   echvit = maxv ;
+   echmvi = '**' ('/' ('MESURE' mt) ('NBEL' mt))
+                 ('/' 1.D0 ('VALEUR' 'DIME')) ;
+   vref = '/' ('*' echmvi 2.D0) echvit ;
+   tit = 'CHAINE' tit '; echvit=' (formar echvit 2) '; ' ;
+* Vecteur unité (en bas à droite)
+   pA = 1000. -1000. ;
+   mpA = mt 'POIN' 'PROC' pA ;
+   cvecu = 'MANUEL' 'CHPO' mpA 2 'UX' echvit 'UY' 0.D0
+        'NATURE' 'DISCRET' ;
+   vecvit1 = 'VECTEUR' chv vref 'UX' 'UY' 'BLEU' ;
+   vecvit2 = 'VECTEUR' cvecu vref 'UX' 'UY' 'ROUG' ;
+   vecvit = 'ET' vecvit1 vecvit2 ;
+'FINSI' ;
+*
+'SI' ('NON' ('EXISTE' lnclk)) ;
+   lnclk = FAUX ;
+'FINSI' ;   
+*
+mt2 = 'CONTOUR' mt ;
+*
+'SI' ('ET' ('NEG' lt 0) ('NEG' lv 0)) ;
+   'SI' lnclk ;
+      'TRACER' echsca cht mt mt2 vecvit 'TITR' tit 'NCLK' ;
+   'SINON' ;   
+      'TRACER' echsca cht mt mt2 vecvit 'TITR' tit ;
+   'FINSI' ;
+'SINON' ;
+   'SI' ('NEG' lt 0) ;   
+      'SI' lnclk ;
+         'TRACER' echsca cht mt mt2 'TITR' tit 'NCLK' ;
+      'SINON' ;   
+         'TRACER' echsca cht mt mt2 'TITR' tit ;
+      'FINSI' ;
+   'FINSI' ;      
+   'SI' ('NEG' lv 0) ;   
+      'SI' lnclk ;
+         'TRACER' mt mt2 vecvit 'TITR' tit 'NCLK' ;
+      'SINON' ;   
+         'TRACER' mt mt2 vecvit 'TITR' tit ;
+      'FINSI' ;
+   'FINSI' ;
+'FINSI' ;   
+*
+* End of procedure file TRCHPO
+*
+'FINPROC';
+umax = 0.5 ;
+*
+* VLIM : Procedure pour définir les conditions aux limites
+*
+'DEBPROC' VLIM ;
+'ARGUMENT' rv*'TABLE';
+'ARGUMENT' t*'FLOTTANT' ;
+   rv . 'CLIM' = '-' (rv . 'CLIM') (rv . 'CLIM') ;
+   vvent  = '*' Umax ('SIN' ('*' ('*' 360.D0 freq) t) ) ;
+   vent   = 'MANUEL' 'CHPO' entmp1 1 'UY' vvent 'NATURE' 'DISCRET' ;
+*
+* Conditions aux limites
+*
+   rv = 'EQEX' rv 'CLIM'
+          'UN' 'VIMP' entmp1 vent ;
+'FINPROC' ;
+*
+* Fin de VLIM
+*************************************************************************
+* NOM         : VPRCOU
+* DESCRIPTION : Procedure pour récupérer vit, pres, rt (rotationnel), cou (la
+*		fonction de courant Courant 2D axi) et rez (le residu) projetes
+*		sur mt dans la table de résultat renvoyée par castax
+*
+* LANGAGE     : GIBIANE-CAST3M
+* AUTEURS     : Stéphane GOUNAND (CEA/DEN/DM2S/SFME/LTMF)
+*               gounand@semt2.smts.cea.fr
+*		Guillaume Pellerin (UPMC/LAM)
+*		pellerin@ccr.jussieu.fr
+*
+* Ce fichier fait partie du programme Castax
+*
+* Copyright 2005 (C) by Stéphane Gounand <gounand@semt2.smts.cea.fr>
+
+*************************************************************************
+*
+'DEBPROC' VPRCOU ;
+'ARGUMENT' rv*'TABLE';
+*
+   vit  = rv . 'INCO' . 'UN' ;
+   nlincour = 'DIME' RV.INCO.ER;
+   'SI' ('EGA' nlincour 0);
+   rez = 0;
+   'SINON';
+   rez = 'EXTRAIRE' RV.INCO.ER nlincour;
+   'FINSI' ;
+   cou = COURANT (RV.INCO.'UN') $mt $fix;
+   rt = 'KOPS' rv.'INCO'.'UN' 'ROT' $mt; 
+   'OPTION' 'MODE' 'PLAN' ;
+   rt = 'ELNO'  $mt ('KCHT'  $mt SCAL CENTRE rt) CENTRE;
+   pres = 'ELNO' $mt (rv . 'INCO' . 'PN') discp ;
+*  pres = '*' pres rho ;
+   'OPTION' 'MODE' 'AXIS' ;
+*
+   'RESPRO' vit pres rt cou rez;
+'FINPROC' ;
+*
+* Fin de VPRCOU
+******************************************************************
+* NOM         : XPORTPS 
+* DESCRIPTION : Procédure interactive pour parcourir la table resultats
+*
+* LANGAGE     : GIBIANE-CAST3M
+* AUTEURS     : Stéphane GOUNAND (CEA/DEN/DM2S/SFME/LTMF)
+*               gounand at semt2.smts.cea.fr
+*		adaptée par Guillaume Pellerin (UPMC/LAM)
+*		pellerin@ccr.jussieu.fr, pour l'export l'affichage du
+*		rotationnel, de la fonction de courant et des trajectoires
+*
+*****************************************************************
+* Usage:
+* XPORTPS matab 
+* 
+* ARGUMENTS:
+* matab : table générale des résultats 
+*
+***********************************************************************
+* Prière de PRENDRE LE TEMPS de compléter les commentaires
+* en cas de modification de ce sous-programme afin de faciliter
+* la maintenance !
+***********************************************************************
+*
+*
+'DEBPROC' XPLORVPR;
+'ARGUMENT' MATAB*'TABLE'  ;
+'ARGUMENT' ni/'ENTIER  ' ;
+'ARGUMENT' ndebu/'ENTIER  ' ;
+'ARGUMENT' nfin/'ENTIER  ' ;
+*
+'TRAC' 'NCLK' 'CACH' mt ;
+tt = matab . 'PRESSIONS' ;
+tv = matab . 'VITESSES' ;
+tr = matab . 'ROTATIONNELS' ;
+tc = matab . 'COURANT';
+ts = matab . 'TRAJECTOIRES';
+*
+nit = 'DIME' tt ;
+nitm1 = '-' nit 1 ;
+nmin = 0 ;
+nmax = nitm1 ;
+'SI' ('NON' ('EXISTE' ni)) ;
+   ni = 'MINIMUM' ('LECT' nit 51) ;
+'FINSI' ;   
+'SI' ('NON' ('EXISTE' ndebu)) ;
+   ndebu = nmin ;
+'FINSI' ;   
+'SI' ('NON' ('EXISTE' nfin)) ;
+   nfin = nmax ;
+'FINSI' ;
+lindic = ISELECT ndebu nfin ni nmin nmax ;
+ind=1;
+noclic = VRAI ;
+echfix = VRAI ;
+*
+* Détermination des échelles
+*
+maxt  = 'PROG' ;
+mint  = 'PROG' ;
+'REPETER' iindic ('DIME' lindic) ;
+   idimt = 'EXTRAIRE' lindic &iindic ;
+*   mytem = 'REDU' (tt . idimt) mt ;
+   mytem = tt . idimt ;
+   maxt  = 'ET' maxt ('PROG' ('MAXIMUM' mytem)) ;
+   mint  = 'ET' mint ('PROG' ('MINIMUM' mytem)) ;
+'FIN' iindic ;
+maxt = 'MAXIMUM' maxt ;
+mint = 'MINIMUM' mint ;
+minmaxt = 'PROG' mint maxt ;
+*
+maxv   = 'PROG' ;
+maxur  = 'PROG' ;
+minur  = 'PROG' ;
+maxuz  = 'PROG' ;
+minuz  = 'PROG' ;
+'REPETER' iindic ('DIME' lindic) ;
+   idimt = 'EXTRAIRE' lindic &iindic ;
+   myvit = tv . idimt ;
+   myur  = 'EXCO' 'UR' myvit 'NOID' ;
+   myuz  = 'EXCO' 'UZ' myvit 'NOID' ;
+   maxv  = APPEND maxv  ('MAXIMUM' myvit 'ABS') ;
+   maxur = APPEND maxur ('MAXIMUM' myur) ;
+   minur = APPEND minur ('MINIMUM' myur) ;
+   maxuz = APPEND maxuz ('MAXIMUM' myuz) ;
+   minuz = APPEND minuz ('MINIMUM' myuz) ;
+'FIN' iindic ;
+maxv = 'MAXIMUM' maxv ;
+maxur = 'MAXIMUM' maxur ;
+minur = 'MINIMUM' minur ;
+minmaxur = 'PROG' minur maxur ;
+maxuz = 'MAXIMUM' maxuz ;
+minuz = 'MINIMUM' minuz ;
+minmaxuz = 'PROG' minuz maxuz ;
+*
+maxr  = 'PROG' ;
+minr  = 'PROG' ;
+'REPETER' iindic ('DIME' lindic) ;
+   idimr = 'EXTRAIRE' lindic &iindic ;
+*   myter = 'REDU' (tr . idimr) mt ;
+   myrem = tr . idimr ;
+   maxr  = 'ET' maxr ('PROG' ('MAXIMUM' myrem)) ;
+   minr  = 'ET' minr ('PROG' ('MINIMUM' myrem)) ;
+'FIN' iindic ;
+maxr = 'MAXIMUM' maxr ;
+minr = 'MINIMUM' minr ;
+minmaxr = 'PROG' minr maxr ;
+
+maxc  = 'PROG' ;
+minc  = 'PROG' ;
+'REPETER' iindic ('DIME' lindic) ;
+   idimc = 'EXTRAIRE' lindic &iindic ;
+   myrem = tc . idimc ;
+   maxc  = 'ET' maxc ('PROG' ('MAXIMUM' myrem)) ;
+   minc  = 'ET' minc ('PROG' ('MINIMUM' myrem)) ;
+'FIN' iindic ;
+maxc = 'MAXIMUM' maxc ;
+minc = 'MINIMUM' minc ;
+minmaxc = 'PROG' minc maxc ;
+
+
+*oisov = 'VALEUR' 'ISOV' ;
+*'OPTION' 'ISOV' 'SURF' ;
+tcha = 'TABLE' ;
+tcha . 1 = 'VetP' ;
+tcha . 2 = 'V' ;
+tcha . 3 = 'P' ;
+tcha . 4 = 'ROT' ;
+tcha . 5 = 'FCOUR' ;
+tcha . 6 = 'x(t)';
+* AJOUT DU ROTATIONNEL
+ntcha = 'DIME' tcha ;
+itcha = 1 ;
+*
+'REPETER' bouc2 ;
+'MESSAGE' 'Noclic permet de ne pas cliquer entre chaque graphique' ;   
+'MESSAGE' '  mais du coup, on ne peut pas zoomer ni sauver en .ps' ;   
+'MESSAGE' 'Echfix permet d_avoir une echelle fixe pour pression  ' ;
+'MESSAGE' '  et vitesse ' ;
+noclic echfix = 'CHOI' 'cochez les options désirées'
+   noclic echfix ;
+*
+'REPETER' bouc1;
+*
+*
+tem = matab.TIME.('EXTRAIRE' lindic ind) ;
+cht = tt . ('EXTRAIRE' lindic ind) ;
+chv = tv . ('EXTRAIRE' lindic ind) ;
+chr = tr . ('EXTRAIRE' lindic ind) ;
+chs = ts . ('EXTRAIRE' lindic ind) ;
+chur = 'EXCO' 'UR' chv 'NOID' 'UR' ;
+chuz = 'EXCO' 'UZ' chv 'NOID' 'UZ' ;
+chc = tc . ('EXTRAIRE' lindic ind) ;
+titt = 'CHAINE' ' ; t=' (formar tem 3) ' s' ;
+titch = 'CHAINE' (tcha . itcha) titt ;
+mailt = mt ;
+'SI' ('EGA' itcha 1) ;
+   'SI' echfix ;
+      TRCHPO mailt cht minmaxt chv maxv titch noclic ;
+   'SINON' ;      
+      TRCHPO mailt cht chv titch noclic ;
+   'FINSI' ;
+'FINSI' ;
+'SI' ('EGA' itcha 2) ;
+   'SI' echfix ;
+      TRCHPO mailt chv maxv titch noclic ;
+   'SINON' ;      
+      TRCHPO mailt chv titch noclic ;
+   'FINSI' ;
+'FINSI' ;
+'SI' ('EGA' itcha 3) ;
+   'SI' echfix ;
+      TRCHPO mailt cht minmaxt titch noclic ;
+   'SINON' ;      
+      TRCHPO mailt cht titch noclic ;
+   'FINSI' ;
+'FINSI' ;
+* AJOUT DU ROTATIONNEL
+'SI' ('EGA' itcha 4) ;
+   'SI' echfix ;
+      TRCHPO mailt chr minmaxr titch noclic ;
+   'SINON' ;      
+      TRCHPO mailt chr titch noclic ;
+   'FINSI' ;
+'FINSI' ;
+* AJOUT DES FONCTIONS DE COURANT
+'SI' ('EGA' itcha 5) ;
+   'SI' echfix ;
+      TRCHPO mailt chc minmaxc titch noclic ;
+   'SINON' ;      
+      TRCHPO mailt chc titch noclic ;
+   'FINSI' ;
+'FINSI' ;
+* AJOUT DES TRAJECTOIRES
+'SI' ('EGA' itcha 6) ;
+     'TRACER' ('ET' cgeo chs) ;
+'FINSI' ;
+*
+*
+tem = matab.TIME.('EXTRAIRE' lindic ind) ;
+cha = 'CHAINE' 'Pas courant : ' ('EXTRAIRE' lindic ind) 
+        ' ; t=' (formar tem 3) ' s' ;
+*ret = 'MENU' cha 'global' (tcha . itcha)
+*   'options' 'n°' 'retracer' 'precedent' 'suivant' ;
+ret = 'MENU' cha 'global' (tcha . itcha)
+   'options' 'precedent' 'suivant' ;
+'SI' ('EGA' ret 'options') ; 'QUITTER' bouc1  ; 'FINSI';
+'SI' ('EGA' ret 'precedent') ; ind = ind - 1; 'FINSI';
+'SI' ('EGA' ret 'suivant')   ; ind = ind + 1; 'FINSI';
+*'SI' ('EGA' ret 'retracer')  ; ind = ind    ; 'FINSI';
+'SI' ('EGA' ret 'Quitter')   ; 'QUITTER' bouc2; 'FINSI';
+*'SI' ('EGA' ret 'n°') ; ind = 'SAIS' 'Numéro du pas : ' 'ENTIER';
+*           'FINSI';
+'SI' ('EGA' ret (tcha. itcha)) ; itcha = '+' itcha 1 ; 'FINSI' ;           
+'SI' ('EGA' ret 'global') ;
+   dessglob matab ;
+'FINSI';
+*
+'SI' (itcha > ntcha); itcha = 1      ; 'FINSI';
+'SI' (ind > ni); ind = 1      ; 'FINSI';
+'SI' (ind < 1);   ind = ni ; 'FINSI';
+*
+*
+'FIN' bouc1;
+'FIN' bouc2 ;
+'FINPRO';
+*
+* Fin de XPLORVPR
+****************************************************************
+* NOM         : XPORTPS 
+* DESCRIPTION : Procédure intérative d'export de tables de soustypes
+*               CHPOIN vers un fichier externe postscript, ou bien
+*               de tables de soustypes EVOLUTION vers postscript ET texte
+*
+* LANGAGE     : GIBIANE-CAST3M
+* AUTEURS     : Guillaume PELLERIN (UPMC/LAM)
+*               pellerin at ccr.jussieu.fr
+*               Adaptée de XPLORPR initialement créée par:
+*               Stéphane GOUNAND (CEA/DEN/DM2S/SFME/LTMF)
+*               gounand at semt2.smts.cea.fr
+*
+*****************************************************************
+* Usage:
+* XPORTPS matab mavar montype monfic echfix [ni ndebu nfin]
+* 
+* ARGUMENTS:
+* matab : table générale des résultats 
+* mavar : nom de la variable (pression, vitesses, etc..) contenue dans matab  
+* montype : type de la variable à exporter (VECT, SCAL, EVOL, EVOLS)
+* monfic : nom du fichier d'export .ps
+* echfix : booléen fixant l'échelle au min et max de chaque variable sur
+*          l'ensemble du mouvement (VRAI) ou bien sur chaque itération (FAUX)
+* ni, ndebu, nfin : paramètres de sous-échantillonage
+*
+***********************************************************************
+* Prière de PRENDRE LE TEMPS de compléter les commentaires
+* en cas de modification de ce sous-programme afin de faciliter
+* la maintenance !
+***********************************************************************
+*
+'DEBPROC' XPORTPS ;
+'ARGUMENT' matab*'TABLE';
+'ARGUMENT' mavar/'MOT';
+'ARGUMENT' montype/'MOT';
+* Type SCAL ou VECT
+'ARGUMENT' monfic/'MOT';
+'ARGUMENT' echfix/'LOGIQUE';
+'ARGUMENT' ni/'ENTIER  ';
+'ARGUMENT' ndebu/'ENTIER  ';
+'ARGUMENT' nfin/'ENTIER  ';
+*
+'SI' ('OU' ('EGA' montype 'EVOL') ('EGA' montype 'EVOLS'));
+   monfic = 'ET' 'ps/' ('ET' mavar '.ps');
+'FINSI';
+*
+'OPTION' TRAC psc;
+'OPTION' FTRA monfic;
+*
+* Definition des projections si champ vectoriel
+'SI' ('EGA' mavar 'VITX');
+   axproj = 'UX';
+   mavar = 'VITESSES';
+'FINSI';
+'SI' ('EGA' mavar 'VITY');
+    axproj = 'UY';
+    mavar = 'VITESSES';
+'FINSI';
+'SI' ('EGA' mavar 'HOWX');
+   axproj = 'UX';
+   mavar = 'HOWE';
+'FINSI';
+'SI' ('EGA' mavar 'HOWY');
+    axproj = 'UY';
+    mavar = 'HOWE';
+'FINSI';
+*
+*
+tt = matab . mavar;
+nit = 'DIME' tt ;
+nitm1 = '-' nit 1 ;
+nmin = 0 ;
+nmax = nitm1 ;
+*
+* Sous echantillonnage pour les traces ?
+ssech = 1;
+'SI' ('NON' ('EXISTE' ni)) ;
+   ni = nit;
+*ni = 'MINIMUM' ('LECT' nit (nit '/' ssech)) ;
+'FINSI' ;   
+'SI' ('NON' ('EXISTE' ndebu)) ;
+   ndebu = nmin ;
+'FINSI' ;   
+'SI' ('NON' ('EXISTE' nfin)) ;
+   nfin = nmax ;
+'FINSI' ;
+*
+lindic = ISELECT ndebu nfin ni nmin nmax ;
+*
+ind=1;
+*
+* Détermination des échelles
+*
+*  Type de sortie : VECT
+*
+ 'SI' ('EGA' montype 'VECT');
+   maxv   = 'PROG' ;
+   maxur  = 'PROG' ;
+   minur  = 'PROG' ;
+   maxuz  = 'PROG' ;
+   minuz  = 'PROG' ;
+   'REPETER' iindic ('DIME' lindic) ;
+   idimt = 'EXTRAIRE' lindic &iindic ;
+   myvit = tt . idimt ;
+   myur  = 'EXCO' 'UR' myvit 'NOID' ;
+   myuz  = 'EXCO' 'UZ' myvit 'NOID' ;
+   maxv  = APPEND maxv  ('MAXIMUM' myvit 'ABS') ;
+   maxur = APPEND maxur ('MAXIMUM' myur) ;
+   minur = APPEND minur ('MINIMUM' myur) ;
+   maxuz = APPEND maxuz ('MAXIMUM' myuz) ;
+   minuz = APPEND minuz ('MINIMUM' myuz) ;
+   'FIN' iindic ;
+   maxv = 'MAXIMUM' maxv ;
+   'FINSI';
+*
+*  Type de sortie : SCAL
+*
+   'SI' ('EGA' montype 'SCAL');
+   maxt  = 'PROG' ;
+   mint  = 'PROG' ;
+   'REPETER' iindic ('DIME' lindic) ;
+   idimt = 'EXTRAIRE' lindic &iindic ;
+*  mytem = 'REDU' (tt . idimt) mt ;
+   mytem = tt . idimt ;
+*
+*  On projete sur UX ou UY si on demande le scalaire de la vitesse
+*
+   'SI' ('EGA' axproj 'UX');
+      mytem = 'EXCO' 'UX' mytem 'UX';
+   'FINSI';
+   'SI' ('EGA' axproj 'UY');
+       mytem = 'EXCO' 'UY' mytem 'UY';
+   'FINSI';
+*
+   maxt  = 'ET' maxt ('PROG' ('MAXIMUM' mytem)) ;
+   mint  = 'ET' mint ('PROG' ('MINIMUM' mytem)) ;
+   'FIN' iindic ;
+   maxt = 'MAXIMUM' maxt ;
+   mint = 'MINIMUM' mint ;
+   maxv = 'PROG' mint maxt ;
+   'FINSI';
+*
+*  Type de sortie : EVOLUTION (une seule)
+*
+   'SI' ('EGA' montype 'EVOL');
+     malist = 'PROG' ;
+     tps = 'PROG' ;
+     ttps = matab . 'time';
+     'REPETER' iindic ('DIME' lindic) ;
+      idimt = 'EXTRAIRE' lindic &iindic ;
+      malist = 'ET' malist ('PROG' tt.idimt) ;
+      tps = 'ET' tps ('PROG' ttps.idimt);
+      'FIN' iindic;
+      maxv = 'MAXIMUM' malist;
+      minv = 'MINIMUM' malist;
+    'FINSI' ;
+*
+*oisov = 'VALEUR' 'ISOV' ;
+*'OPTION' 'ISOV' 'SURF' ;
+*
+* Sorties
+*
+* si EVOL
+   'SI' ('EGA' montype 'EVOL');
+    EVOP = 'EVOL' 'MANU' 'TEMPS' tps mavar malist;
+    tableg = 'TABLE' ;
+    tableg.1 = 'MOT' 'MARQ LOSA';
+    tableg.TITRE = 'TABLE' ;
+    tableg.TITRE = '';
+   'DESSIN'  EVOP 'XBOR' 0. (maxi tps) 'YBOR' (1.5*minv) (1.5*maxv)
+               'LEGE' tableg ;
+    JECRI2 tps malist ('DIME' lindic) ('CHAINE' 'txt/ev_' mavar '.txt');
+   'FINSI';
+*
+* si EVOLS
+   'SI' ('EGA' montype 'EVOLS');
+   'REPETER' mindic ('-' ('DIME' lindic) 1);
+    idimt = '+' ('EXTRAIRE' lindic &mindic) 1 ;
+    EVOF = tt.idimt ;
+    tableg = 'TABLE' ;
+    tableg.1 = 'MOT' 'MARQ LOSA';
+    tableg.TITRE = 'TABLE' ;
+    tableg.TITRE = 'CHAINE' mavar ', inc=' idimt;
+   'DESSIN'  EVOF  'LEGE' tableg ;
+    x = 'EXTRAIRE' EVOF 'ABSC';
+    y = 'EXTRAIRE' EVOF 'ORDO';
+    idfic = idimt;
+    'SI' ('<EG' idimt 999);
+      idfic = 'CHAINE' '0' idimt;
+    'FINSI' ;
+    'SI' ('<EG' idimt 99);
+      idfic = 'ET' '0' idfic;
+    'FINSI' ;
+    'SI' ('<EG' idimt 9);
+      idfic = 'ET' '0' idfic;
+    'FINSI' ;
+    ficev = 'CHAINE' 'txt/ev_' mavar '_' idfic '.txt';
+    JECRI2 x y ('DIME' x) ficev;
+   'FIN' mindic;
+   'FINSI';
+*
+* si SCAL ou VECT
+   'SI'  ('OU' ('EGA' montype 'SCAL') ('EGA' montype 'VECT'));
+*
+   'REPETER' kindic  ('DIME' lindic);
+*
+   idimt = 'EXTRAIRE' lindic &kindic ;
+*     from 0.4.0
+   'SI' ('EXISTE' matab 'TIME');
+   tem = matab.TIME.idimt ;
+   'SINON';
+   tem = matab.TEMPS.idimt ;
+   'FINSI' ;
+   cht = tt . idimt ;
+*
+* On projete sur UX ou UY si on demande le scalaire de la vitesse
+*
+   'SI' ('EGA' axproj 'UX');
+      cht = 'EXCO' 'UX' cht 'UX';
+   'FINSI';
+   'SI' ('EGA' axproj 'UY');
+      cht = 'EXCO' 'UY' cht 'UY';
+   'FINSI';
+*
+   titt = 'CHAINE' ':t='tem's:'titglob;
+   titch = 'CHAINE' mavar titt ;
+*
+   'SI' echfix ;
+      TRCHPO mt cht maxv titch;
+   'SINON' ;      
+      TRCHPO mt cht titch;
+   'FINSI' ;
+*
+   'FIN' kindic;
+  'FINSI' ;
+
+* Cas des trajectoires
+ 'SI'  ('EGA' mavar 'TRAJECTOIRES');
+*
+   'REPETER' kindic  ('DIME' lindic);
+*
+   idimt = 'EXTRAIRE' lindic &kindic ;
+*     from 0.4.0
+   'SI' ('EXISTE' matab 'TIME');
+      tem = matab.TIME.idimt ;
+   'SINON';
+      tem = matab.TEMPS.idimt ;
+   'FINSI' ;
+   
+   cht = tt . idimt ;
+   titt = 'CHAINE' ':t='tem's:'titglob;
+   titch = 'CHAINE' mavar titt ;
+   'TRACER' cht 'TITRE' titch;
+
+   'FIN' kindic;
+ 'FINSI' ;
+   
+'OPTION' FTRA 'tmp.ps';
+*
+'FINPRO';
+*
+* Fin de XPORTPS
+*

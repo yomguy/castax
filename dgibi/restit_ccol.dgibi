@@ -1,0 +1,109 @@
+* 
+* restit_xplor.dgibi
+* a part of castax restit tools for recomputing throat plots and datas
+*
+* This program is part of Castax.
+*
+* Copyright (C) 2002-2005 by Guillaume Pellerin <pellerin@ccr.jussieu.fr>
+*
+* This software is governed by the CeCILL license under French law and
+* abiding by the rules of distribution of free software.  You can  use, 
+* modify and/ or redistribute the software under the terms of the CeCILL
+* license as circulated by CEA, CNRS and INRIA at the following URL
+* "http://www.cecill.info". 
+* 
+* As a counterpart to the access to the source code and  rights to copy,
+* modify and redistribute granted by the license, users are provided only
+* with a limited warranty  and the software's author,  the holder of the
+* economic rights,  and the successive licensors  have only  limited
+* liability. 
+* 
+* In this respect, the user's attention is drawn to the risks associated
+* with loading,  using,  modifying and/or developing or reproducing the
+* software by the user in light of its specific status of free software,
+* that may mean  that it is complicated to manipulate,  and  that  also
+* therefore means  that it is reserved for developers  and  experienced
+* professionals having in-depth computer knowledge. Users are therefore
+* encouraged to load and test the software's suitability as regards their
+* requirements in conditions enabling the security of their systems and/or 
+* data to be ensured and,  more generally, to use and operate it in the 
+* same conditions as regards security. 
+* 
+* The fact that you are presently reading this means that you have had
+* knowledge of the CeCILL license and that you accept its terms.
+************************************************************
+*
+OPTION' 'RESTITUER' 'data.sauv';
+'RESTITUER';
+
+'OPTION' 'DIME' 2 'ELEM' QUA8 'MODE' 'AXIS' ;
+*
+dcoul = 0.101;
+nc = 1;
+entree = 'DROIT' rtuydia (0.0 absi.nc) (('-' ord.nc coulm) absi.nc);
+cou_ent = 'DROIT' rcoulm (('-' ord.nc coulm) absi.nc) (ord.nc absi.nc)
+         dini 0.1 dfin dcoul;
+entree = 'ET' entree cou_ent;
+'ELIMINATION' 0.000000001 entree;
+*
+nc = np.1;
+sortie = 'DROIT' rtuydia (0.0 absi.nc) (('-' ord.nc coulm) absi.nc);
+cou_sor = 'DROIT' rcoulm (('-' ord.nc coulm) absi.nc) (ord.nc absi.nc)
+         dini 0.1 dfin dcoul;
+sortie = 'ET' sortie cou_sor;
+'ELIMINATION' 0.000000001 sortie;
+*
+p99=ord.1 0.0;
+p98 = entree 'POIN' 'PROC' p99;;
+entmp1 = 'DIFF' ('CHANGER' ent 'POI1')
+                ('MANUEL' 'POI1' p98);
+* Section au col
+n = np.1;
+nc = '/' n 2;
+col = 'DROIT' rtuydia (0.0 absi.nc) (('-' ord.nc coulm) absi.nc);
+cou_col = 'DROIT' rcoulm (('-' ord.nc coulm) absi.nc) (ord.nc absi.nc)
+         dini 0.1 dfin dcoul;
+col = 'ET' col cou_col;
+'ELIMINATION' 0.000000001 col;
+itcou = 0;
+nitma = 216;
+*
+*modifs
+   capt.'p_ent' = 'TABLE' ;
+   capt.'v_ent' = 'TABLE' ;
+   capt.'p_sor' = 'TABLE' ;
+   capt.'v_sor' = 'TABLE' ;
+   capt.'p_col' = 'TABLE' ;
+   capt.'v_col' = 'TABLE' ;
+   capt.'p_ent'.itcou = 0 ;
+   capt.'v_ent'.itcou = 0 ;
+   capt.'p_sor'.itcou = 0 ;
+   capt.'v_sor'.itcou = 0 ;
+   capt.'p_col'.itcou = 0 ;
+   capt.'v_col'.itcou = 0 ;
+*
+'REPETER' iitma nitma;
+*
+   itcou = '+' itcou 1 ;
+*
+* Calcul des evolutions
+pr00 pr01 pr03 pr05 pr07 pr10 pr11 pr12 vr00 vr10 vr11
+vr12 zray ze preaxe vitaxe intaxe taupar prepar p_ent
+v_ent p_sor v_sor p_col v_col = RENP res itcou;
+*
+   capt.'p_ent'.itcou = p_ent ;
+   capt.'v_ent'.itcou = v_ent ;
+   capt.'p_sor'.itcou = p_sor ;
+   capt.'v_sor'.itcou = v_sor ;
+   capt.'p_col'.itcou = p_col ;
+   capt.'v_col'.itcou = v_col ;
+*
+'FIN' iitma ;
+*
+XPORTPS capt 'p_ent' 'EVOLS';
+XPORTPS capt 'v_ent' 'EVOLS';
+XPORTPS capt 'p_sor' 'EVOLS';
+XPORTPS capt 'v_sor' 'EVOLS';
+XPORTPS capt 'p_col' 'EVOLS';
+XPORTPS capt 'v_col' 'EVOLS';
+*

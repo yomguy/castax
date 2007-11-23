@@ -1,0 +1,128 @@
+#! /bin/sh
+# --------------------------------------------------------------------
+# castax: castax bash script to compute a parametric castem execution
+#         files needed: castax_main.dgibi, proc/*
+#
+# This program is part of Castax.
+#
+# Copyright (C) 2002-2005 by Guillaume Pellerin <pellerin@ccr.jussieu.fr>
+#
+# This software is governed by the CeCILL license under French law and
+# abiding by the rules of distribution of free software.  You can  use, 
+# modify and/ or redistribute the software under the terms of the CeCILL
+# license as circulated by CEA, CNRS and INRIA at the following URL
+# "http://www.cecill.info". 
+# 
+# As a counterpart to the access to the source code and  rights to copy,
+# modify and redistribute granted by the license, users are provided only
+# with a limited warranty  and the software's author,  the holder of the
+# economic rights,  and the successive licensors  have only  limited
+# liability. 
+# 
+# In this respect, the user's attention is drawn to the risks associated
+# with loading,  using,  modifying and/or developing or reproducing the
+# software by the user in light of its specific status of free software,
+# that may mean  that it is complicated to manipulate,  and  that  also
+# therefore means  that it is reserved for developers  and  experienced
+# professionals having in-depth computer knowledge. Users are therefore
+# encouraged to load and test the software's suitability as regards their
+# requirements in conditions enabling the security of their systems and/or 
+# data to be ensured and,  more generally, to use and operate it in the 
+# same conditions as regards security. 
+# 
+# The fact that you are presently reading this means that you have had
+# knowledge of the CeCILL license and that you accept its terms.
+# -------------------------------------------------------------
+#
+# USAGE:
+# castax $1 $2 $3 $4 $5 $6
+# where :
+# $1 is the maximum velocity value desired at the input of the duct
+# $2 is the frequency of the input sinusoid velocity
+# $3 is the .geo file containing the 2D profile of the duct
+# $4 is the directory path for backuping (/*.tgz + restit)
+# $5 is the directory path for results (res/ is default)
+# optional:
+# $6 is the video exporting option (type "videos" to export)
+#
+# -------------------------------------------------------------
+#
+#
+# Takes the result directory in $5
+dirres=$5
+# 
+# Number of frames for each image in the videos
+nimg=4
+#
+# adapting PATH variable
+if [ -x `echo $PATH | grep "castax"` ]; then
+export PATH="$PATH":$CASTAX/bin
+fi
+#
+# insert parameters in procedures
+echo "umax =" $1 ";" > proc/UMAX.dgibi
+echo "freq =" $2 ";" > proc/FREQ.dgibi
+echo "profil ='"$3"';" > proc/PROFIL.dgibi
+#
+# add a "0" to u=$1 if u < 1 (avoid .125... )
+u=$1
+if [ ${u:0:1} = "." ]; then 
+      u=0$u
+fi
+#
+# create data subdirectories
+if [ ! -d $dirres ]; then
+	mkdir $dirres
+fi
+if [ ! -d $dirres/$3 ]; then
+	mkdir $dirres/$3
+fi
+if [ ! -d $dirres/$3/$2 ]; then
+	mkdir $dirres/$3/$2
+fi
+if [ ! -d $dirres/$3/$2/$u ]; then
+	mkdir $dirres/$3/$2/$u
+fi
+if [ ! -d $dirres/$3/$2/$u/txt ]; then
+	mkdir $dirres/$3/$2/$u/txt
+fi
+if [ ! -d $dirres/$3/$2/$u/ps ]; then
+	mkdir $dirres/$3/$2/$u/ps
+fi
+#
+# copy geometries (geo 2D text shapes in mm)
+cp geo/$3 $dirres/$3/$2/$u/
+#
+# concatenate external procedures and main file (including geometry and meshing) 
+cat $CASTAX/proc/*.dgibi > $CASTAX/tmp/utilproc.dgibi
+cat $CASTAX/tmp/utilproc.dgibi $CASTAX/dgibi/castax_main.dgibi > $dirres/$3/$2/$u/castax.dgibi
+#
+# execute cast3m in $3/$2/$u
+cd $dirres/$3/$2/$u
+castem castax.dgibi | tee output.txt
+cd $CASTAX
+#
+# give restitution script and dgibi
+cp $CASTAX/bin/restit $dirres/$3/$2/$u
+cp $CASTAX/tmp/utilproc.dgibi $dirres/$3/$2/$u
+#
+# removing empty files
+rm $dirres/$3/$2/$u/UTIL*
+rm $dirres/$3/$2/$u/tmp*
+#
+# backuping results in $4/$3/$2/$u using bckp
+if [ $6 = "videos" ]; then
+castax_bckp $u $2 $3 $4 $dirres
+else
+castax_bckp $u $2 $3 $4 $dirres &
+fi
+dirbckp=$4/$3/$2/$u
+echo "Backup done in:" $dirbckp
+#
+# generates videos if $6="videos"
+if [ $6 = "videos" ]; then
+pstompg_chpo.sh $dirres/$3/$2/$u $3 $dirbckp $nimg &
+fi
+#
+# end of castax
+#

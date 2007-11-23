@@ -1,0 +1,137 @@
+************************************************************************
+* NOM         : TRCHPO
+* DESCRIPTION : Trace un ou deux chpoints
+*
+*
+*
+* LANGAGE     : GIBIANE-CAST3M
+* AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SFME/LTMF)
+*               mél : gounand@semt2.smts.cea.fr
+**********************************************************************
+* VERSION    : v1, 06/09/2004, version initiale
+* HISTORIQUE : v1, 06/09/2004, création
+* HISTORIQUE :
+* HISTORIQUE :
+************************************************************************
+* Prière de PRENDRE LE TEMPS de compléter les commentaires
+* en cas de modification de ce sous-programme afin de faciliter
+* la maintenance !
+************************************************************************
+*
+*
+'DEBPROC' TRCHPO ;
+'ARGUMENT' mt*'MAILLAGE' ;
+lt = 0 ; lv = 0 ;
+* Lecture des arguments
+'ARGUMENT' ch1*'CHPOINT' ;
+lcom1  = 'EXTRAIRE' ch1 'COMP' ;
+nlcom1 = 'DIME' lcom1 ;
+'SI' ('EGA' nlcom1 1) ;
+   lt = 1 ;
+   cht = ch1 ;
+   'ARGUMENT' minmaxt/'LISTREEL' ;
+'FINSI' ;      
+'SI' ('OU' ('EGA' nlcom1 2) ('EGA' nlcom1 0)) ;
+   lv = 1 ;
+   chv = ch1 ;
+   'ARGUMENT' maxv/'FLOTTANT' ;
+'FINSI' ;      
+'ARGUMENT' ch2/'CHPOINT' ;
+'SI' ('EXISTE' ch2) ;
+   lcom2  = 'EXTRAIRE' ch2 'COMP' ;
+   nlcom2 = 'DIME' lcom2 ;
+   'SI' ('ET' ('EGA' nlcom2 1) ('EGA' lt 0)) ;
+      lt = 2 ;
+      cht = ch2 ;
+      'ARGUMENT' minmaxt/'LISTREEL' ;
+   'FINSI' ;      
+   'SI'  ('ET' ('OU' ('EGA' nlcom2 2) ('EGA' nlcom2 0))
+               ('EGA' lv 0)) ;
+      lv = 2 ;
+      chv = ch2 ;
+      'ARGUMENT' maxv/'FLOTTANT' ;
+   'FINSI' ;
+'FINSI' ;   
+*
+'ARGUMENT' tit/'MOT     ' ;
+'SI' ('NON' ('EXISTE' tit)) ;
+   tit = 'CHAINE' 't=' (formar t 3) ' s' ;
+'FINSI' ;   
+*
+'ARGUMENT' lnclk/'LOGIQUE' ;
+*
+*
+* Détermination de l'échelle des pressions
+*
+'SI' ('NEG' lt 0) ;
+   'SI' ('EXISTE' minmaxt) ;
+      mint = 'EXTRAIRE' minmaxt 1 ;
+      maxt = 'EXTRAIRE' minmaxt 2 ;
+   'SINON' ;
+      mint = 'MINIMUM' cht ;   
+      maxt = 'MAXIMUM' cht ;   
+   'FINSI' ;
+   'SI' ('EGA' mint maxt ('*' 1.D-6 maxt)) ;
+      maxt = '+' mint 1. ;
+   'FINSI' ;
+   nbisov = 25 ;
+   past = '/' ('-' maxt mint) ('FLOTTANT' nbisov) ;
+   echsca = 'PROG' mint PAS past NPAS nbisov ;
+'FINSI' ;
+*
+* Détermination de l'échelle de vitesses
+*
+'SI' ('NEG' lv 0) ;
+   'SI' ('NON' ('EXISTE' maxv)) ;
+      maxv = 'MAXIMUM' chv 'ABS' ;
+   'FINSI' ;
+   'SI' ('<' maxv 1.D-6) ;
+      maxv = 1.D0 ;
+   'FINSI' ;
+   echvit = maxv ;
+   echmvi = '**' ('/' ('MESURE' mt) ('NBEL' mt))
+                 ('/' 1.D0 ('VALEUR' 'DIME')) ;
+   vref = '/' ('*' echmvi 2.D0) echvit ;
+   tit = 'CHAINE' tit '; echvit=' (formar echvit 2) '; ' ;
+* Vecteur unité (en bas à droite)
+   pA = 1000. -1000. ;
+   mpA = mt 'POIN' 'PROC' pA ;
+   cvecu = 'MANUEL' 'CHPO' mpA 2 'UX' echvit 'UY' 0.D0
+        'NATURE' 'DISCRET' ;
+   vecvit1 = 'VECTEUR' chv vref 'UX' 'UY' 'BLEU' ;
+   vecvit2 = 'VECTEUR' cvecu vref 'UX' 'UY' 'ROUG' ;
+   vecvit = 'ET' vecvit1 vecvit2 ;
+'FINSI' ;
+*
+'SI' ('NON' ('EXISTE' lnclk)) ;
+   lnclk = FAUX ;
+'FINSI' ;   
+*
+mt2 = 'CONTOUR' mt ;
+*
+'SI' ('ET' ('NEG' lt 0) ('NEG' lv 0)) ;
+   'SI' lnclk ;
+      'TRACER' echsca cht mt mt2 vecvit 'TITR' tit 'NCLK' ;
+   'SINON' ;   
+      'TRACER' echsca cht mt mt2 vecvit 'TITR' tit ;
+   'FINSI' ;
+'SINON' ;
+   'SI' ('NEG' lt 0) ;   
+      'SI' lnclk ;
+         'TRACER' echsca cht mt mt2 'TITR' tit 'NCLK' ;
+      'SINON' ;   
+         'TRACER' echsca cht mt mt2 'TITR' tit ;
+      'FINSI' ;
+   'FINSI' ;      
+   'SI' ('NEG' lv 0) ;   
+      'SI' lnclk ;
+         'TRACER' mt mt2 vecvit 'TITR' tit 'NCLK' ;
+      'SINON' ;   
+         'TRACER' mt mt2 vecvit 'TITR' tit ;
+      'FINSI' ;
+   'FINSI' ;
+'FINSI' ;   
+*
+* End of procedure file TRCHPO
+*
+'FINPROC';

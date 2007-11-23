@@ -1,0 +1,29 @@
+Castax' Changelog
+
+* Version:      0.4.2  09/04/2005  G. Pellerin
+*  		debugging, fonctions scripts, options procédures
+*		recupération des pressions et vitesses radiales
+*		changement de nom
+*		
+*		0.4.1  15/11/2004  G. Pellerin
+*               export des courbes et tableaux, création des scripts,
+*               backups, adaptation de pstompg
+*
+*		0.4  01/11/2004  G. Pellerin, S. Gounand, F. Dabbene
+*               ajout et modification des prodedures GOON
+*               (XPLOVPR, TRCHPO, RESIDU, etc...)
+*                XPORTPS
+*		
+*		0.3  25/10/2003  G. Pellerin
+*               debugging, paramétrisation
+*		
+*		0.2  20/06/2003  N. Quaegebeur, G. Pellerin
+*               introduction de l'instationnarité DFDT,
+*                algorithme itératif, export des courbes
+*                procédure VLIM
+*
+*		0.1  12/2002  Pierre-Yves Lagrée, G. Pellerin
+*               NS stationnaire sur plan 2D infini
+*               adaptation pour axisymétrie
+
+Copyright (C) 2002-2005  Guillaume Pellerin <pellerin@ccr.jussieu.fr>

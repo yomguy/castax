@@ -1,0 +1,83 @@
+****************************************
+* JELIS2D Procedure de lecture
+* d'un tableau Nx2  (separateur: espace)
+*
+'DEBPROC' JELIS2D nfic*mot npn*entier;
+*
+absz = table ;
+ordr = table ;
+*
+'OPTION' acqu nfic;
+*
+'REPETER' bloc3 npn;
+  i = &bloc3;
+  acqu a o;
+* en mm
+  absz.i = a;
+  ordr.i = o;
+'FIN' bloc3;
+*
+'RESPRO' absz ordr;
+*
+* Fin Procedure JELIS2D
+*
+'FINPROC' ;
+*
+**********************************
+* JECRI :  Procedure d'ecriture 01
+*
+'DEBPROC'  JECRI modefour*table modefreq*table freq*table 
+            nbh*entier ficout*mot;
+i=1;
+ii='VALEUR'  impr;
+'OPTION'  impr 10 impr ficout;
+'REPETER'  bou1 nbh;
+   mf1 = modefour.i;
+   mf2 = modefreq.i;
+   f = freq.i;
+   'MESSAGE'  ' Mode : ' mf1 ' - ' mf2 ' / Frequence = ' f 'Hz';
+  i = i + 1;
+'FIN'  bou1;
+'OPTION'  impr ii;
+*
+* Fin procedure JECRI
+*
+'FINPROC';
+*
+**********************************
+* JECRI2 : Procedure d'ecriture 02
+*
+'DEBPROC' JECRI2 temps*listreel freq*listreel nbh*entier ficout*mot;
+i=1;
+ii='VALEUR'  impr;
+'OPTION'  impr 10 impr ficout;
+'REPETER'  bou1 nbh;
+    f = 'EXTRAIRE'  freq i;
+    t = 'EXTRAIRE'  temps i;
+    'MESSAGE'  t f;
+  i = i + 1;
+'FIN'  bou1;
+'OPTION'  impr ii;
+*
+* Fin Procedure JECRI2
+*
+'FINPROC';
+*
+**********************************
+* JECRI3 : Procedure d'ecriture 03
+*
+'DEBPROC' JECRI3 freq*listreel nbh*entier ficout*mot;
+i=1;
+ii='VALEUR'  impr;
+'OPTION'  impr 10 impr ficout;
+'REPETER'  bou1 nbh;
+    f = 'EXTRAIRE'  freq i;
+    'MESSAGE'  f;
+  i = i + 1;
+'FIN'  bou1;
+'OPTION'  impr ii;
+*
+* Fin Procedure JECRI3
+*
+'FINPROC';
+*

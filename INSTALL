@@ -1,0 +1,20 @@
+Castax : HELP for installation
+---------------------------------
+
+To create all the needed paths and environnement variables, just type:
+
+source install.sh
+
+or
+
+. install.sh
+ 
+Define simulation parameters now by editing the script ./castax3m and
+./dgibi/castax_main.dgibi
+
+See README for execution details.
+
+Copyright 2005 (C) by Guillaume Pellerin <pellerin@ccr.jussieu.fr>
+distributed under the terms of the CeCILL license (Version 2)
+See the COPYING file for details or:
+http://www.cecill.info/licences/Licence_CeCILL_V2-en.html

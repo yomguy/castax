@@ -1,0 +1,89 @@
+************************************************************************
+* NOM         : APPEND
+* DESCRIPTION : Rajoute :
+*               - un entier à un listentier
+*               - un réel   à un listreel
+*               - un objet (rigidité ou chpoint) à un indice de table
+*                    * si l'indice n'existe pas
+*                    * 'ET' si l'indice existe 
+*                
+*
+*
+* LANGAGE     : GIBIANE-CAST3M
+* AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SFME/LTMF)
+*               mél : gounand@semt2.smts.cea.fr
+**********************************************************************
+* VERSION    : v1, 10/09/2004, version initiale
+* HISTORIQUE : v1, 10/09/2004, création
+* HISTORIQUE :
+* HISTORIQUE :
+************************************************************************
+* Prière de PRENDRE LE TEMPS de compléter les commentaires
+* en cas de modification de ce sous-programme afin de faciliter
+* la maintenance !
+************************************************************************
+*
+*
+'DEBPROC' APPEND ;
+'ARGUMENT' tab/'TABLE' ;
+'SI' ('EXISTE' tab) ;
+   'ARGUMENT' itab*'MOT' ;
+   lobj = FAUX ;
+   'SI' ('NON' lobj) ;
+      'ARGUMENT' lr/'LISTREEL' ;
+      'SI' ('EXISTE' lr) ;
+         obj = lr ; lobj = VRAI ;
+      'FINSI' ;
+   'FINSI' ;               
+   'SI' ('NON' lobj) ;
+      'ARGUMENT' le/'LISTENTI' ;
+      'SI' ('EXISTE' le) ;
+         obj = le ; lobj = VRAI ;
+      'FINSI' ;
+   'FINSI' ;               
+   'SI' ('NON' lobj) ;
+      'ARGUMENT' chpo/'CHPOINT' ;
+      'SI' ('EXISTE' chpo) ;
+         obj = chpo ; lobj = VRAI ;
+      'FINSI' ;
+   'FINSI' ;               
+   'SI' ('NON' lobj) ;
+      'ARGUMENT' rig/'RIGIDITE' ;
+      'SI' ('EXISTE' rig) ;
+         obj = rig ; lobj = VRAI ;
+      'FINSI' ;
+   'FINSI' ;               
+   'SI' ('NON' lobj) ;
+      'ARGUMENT' matk/'MATRIK' ;
+      'SI' ('EXISTE' matk) ;
+         obj = matk ; lobj = VRAI ;
+      'FINSI' ;
+   'FINSI' ;
+   'SI' ('NON' lobj) ;
+      cherr = 'CHAINE'
+       'Il faut fournir un objet list chpoint ou matrice.' ; 
+      'ERREUR' cherr ;
+   'FINSI' ;      
+   'SI' ('EXISTE' tab itab) ;
+      tab . itab = 'ET' (tab . itab) obj ;
+   'SINON' ;
+      tab . itab = obj ;
+   'FINSI' ;
+   'RESPRO' tab ;      
+'FINSI' ;   
+'ARGUMENT' lenti/'LISTENTI' ;
+'ARGUMENT' lreel/'LISTREEL' ;
+'SI' ('EXISTE' lenti) ;
+   'ARGUMENT' enti*'ENTIER' ;
+   lenti = 'ET' lenti ('LECT' enti) ;
+   'RESPRO' lenti ;
+'FINSI' ;   
+'SI' ('EXISTE' lreel) ;
+   'ARGUMENT' reel*'FLOTTANT' ;
+   lreel = 'ET' lreel ('PROG' reel) ;
+   'RESPRO' lreel ;
+'FINSI' ;   
+*
+* End of procedure file APPEND
+*
+'FINPROC';

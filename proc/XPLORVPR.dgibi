@@ -1,0 +1,228 @@
+*****************************************************************
+* NOM         : XPORTPS 
+* DESCRIPTION : Procédure interactive pour parcourir la table resultats
+*
+* LANGAGE     : GIBIANE-CAST3M
+* AUTEURS     : Stéphane GOUNAND (CEA/DEN/DM2S/SFME/LTMF)
+*               gounand at semt2.smts.cea.fr
+*		adaptée par Guillaume Pellerin (UPMC/LAM)
+*		pellerin@ccr.jussieu.fr, pour l'export l'affichage du
+*		rotationnel, de la fonction de courant et des trajectoires
+*
+*****************************************************************
+* Usage:
+* XPORTPS matab 
+* 
+* ARGUMENTS:
+* matab : table générale des résultats 
+*
+***********************************************************************
+* Prière de PRENDRE LE TEMPS de compléter les commentaires
+* en cas de modification de ce sous-programme afin de faciliter
+* la maintenance !
+***********************************************************************
+*
+*
+'DEBPROC' XPLORVPR;
+'ARGUMENT' MATAB*'TABLE'  ;
+'ARGUMENT' ni/'ENTIER  ' ;
+'ARGUMENT' ndebu/'ENTIER  ' ;
+'ARGUMENT' nfin/'ENTIER  ' ;
+*
+'TRAC' 'NCLK' 'CACH' mt ;
+tt = matab . 'PRESSIONS' ;
+tv = matab . 'VITESSES' ;
+tr = matab . 'ROTATIONNELS' ;
+tc = matab . 'COURANT';
+ts = matab . 'TRAJECTOIRES';
+*
+nit = 'DIME' tt ;
+nitm1 = '-' nit 1 ;
+nmin = 0 ;
+nmax = nitm1 ;
+'SI' ('NON' ('EXISTE' ni)) ;
+   ni = 'MINIMUM' ('LECT' nit 51) ;
+'FINSI' ;   
+'SI' ('NON' ('EXISTE' ndebu)) ;
+   ndebu = nmin ;
+'FINSI' ;   
+'SI' ('NON' ('EXISTE' nfin)) ;
+   nfin = nmax ;
+'FINSI' ;
+lindic = ISELECT ndebu nfin ni nmin nmax ;
+ind=1;
+noclic = VRAI ;
+echfix = VRAI ;
+*
+* Détermination des échelles
+*
+maxt  = 'PROG' ;
+mint  = 'PROG' ;
+'REPETER' iindic ('DIME' lindic) ;
+   idimt = 'EXTRAIRE' lindic &iindic ;
+*   mytem = 'REDU' (tt . idimt) mt ;
+   mytem = tt . idimt ;
+   maxt  = 'ET' maxt ('PROG' ('MAXIMUM' mytem)) ;
+   mint  = 'ET' mint ('PROG' ('MINIMUM' mytem)) ;
+'FIN' iindic ;
+maxt = 'MAXIMUM' maxt ;
+mint = 'MINIMUM' mint ;
+minmaxt = 'PROG' mint maxt ;
+*
+maxv   = 'PROG' ;
+maxur  = 'PROG' ;
+minur  = 'PROG' ;
+maxuz  = 'PROG' ;
+minuz  = 'PROG' ;
+'REPETER' iindic ('DIME' lindic) ;
+   idimt = 'EXTRAIRE' lindic &iindic ;
+   myvit = tv . idimt ;
+   myur  = 'EXCO' 'UR' myvit 'NOID' ;
+   myuz  = 'EXCO' 'UZ' myvit 'NOID' ;
+   maxv  = APPEND maxv  ('MAXIMUM' myvit 'ABS') ;
+   maxur = APPEND maxur ('MAXIMUM' myur) ;
+   minur = APPEND minur ('MINIMUM' myur) ;
+   maxuz = APPEND maxuz ('MAXIMUM' myuz) ;
+   minuz = APPEND minuz ('MINIMUM' myuz) ;
+'FIN' iindic ;
+maxv = 'MAXIMUM' maxv ;
+maxur = 'MAXIMUM' maxur ;
+minur = 'MINIMUM' minur ;
+minmaxur = 'PROG' minur maxur ;
+maxuz = 'MAXIMUM' maxuz ;
+minuz = 'MINIMUM' minuz ;
+minmaxuz = 'PROG' minuz maxuz ;
+*
+maxr  = 'PROG' ;
+minr  = 'PROG' ;
+'REPETER' iindic ('DIME' lindic) ;
+   idimr = 'EXTRAIRE' lindic &iindic ;
+*   myter = 'REDU' (tr . idimr) mt ;
+   myrem = tr . idimr ;
+   maxr  = 'ET' maxr ('PROG' ('MAXIMUM' myrem)) ;
+   minr  = 'ET' minr ('PROG' ('MINIMUM' myrem)) ;
+'FIN' iindic ;
+maxr = 'MAXIMUM' maxr ;
+minr = 'MINIMUM' minr ;
+minmaxr = 'PROG' minr maxr ;
+
+maxc  = 'PROG' ;
+minc  = 'PROG' ;
+'REPETER' iindic ('DIME' lindic) ;
+   idimc = 'EXTRAIRE' lindic &iindic ;
+   myrem = tc . idimc ;
+   maxc  = 'ET' maxc ('PROG' ('MAXIMUM' myrem)) ;
+   minc  = 'ET' minc ('PROG' ('MINIMUM' myrem)) ;
+'FIN' iindic ;
+maxc = 'MAXIMUM' maxc ;
+minc = 'MINIMUM' minc ;
+minmaxc = 'PROG' minc maxc ;
+
+
+*oisov = 'VALEUR' 'ISOV' ;
+*'OPTION' 'ISOV' 'SURF' ;
+tcha = 'TABLE' ;
+tcha . 1 = 'VetP' ;
+tcha . 2 = 'V' ;
+tcha . 3 = 'P' ;
+tcha . 4 = 'ROT' ;
+tcha . 5 = 'FCOUR' ;
+tcha . 6 = 'x(t)';
+* AJOUT DU ROTATIONNEL
+ntcha = 'DIME' tcha ;
+itcha = 1 ;
+*
+'REPETER' bouc2 ;
+'MESSAGE' 'Noclic permet de ne pas cliquer entre chaque graphique' ;   
+'MESSAGE' '  mais du coup, on ne peut pas zoomer ni sauver en .ps' ;   
+'MESSAGE' 'Echfix permet d_avoir une echelle fixe pour pression  ' ;
+'MESSAGE' '  et vitesse ' ;
+noclic echfix = 'CHOI' 'cochez les options désirées'
+   noclic echfix ;
+*
+'REPETER' bouc1;
+*
+*
+tem = matab.TIME.('EXTRAIRE' lindic ind) ;
+cht = tt . ('EXTRAIRE' lindic ind) ;
+chv = tv . ('EXTRAIRE' lindic ind) ;
+chr = tr . ('EXTRAIRE' lindic ind) ;
+chs = ts . ('EXTRAIRE' lindic ind) ;
+chur = 'EXCO' 'UR' chv 'NOID' 'UR' ;
+chuz = 'EXCO' 'UZ' chv 'NOID' 'UZ' ;
+chc = tc . ('EXTRAIRE' lindic ind) ;
+titt = 'CHAINE' ' ; t=' (formar tem 3) ' s' ;
+titch = 'CHAINE' (tcha . itcha) titt ;
+mailt = mt ;
+'SI' ('EGA' itcha 1) ;
+   'SI' echfix ;
+      TRCHPO mailt cht minmaxt chv maxv titch noclic ;
+   'SINON' ;      
+      TRCHPO mailt cht chv titch noclic ;
+   'FINSI' ;
+'FINSI' ;
+'SI' ('EGA' itcha 2) ;
+   'SI' echfix ;
+      TRCHPO mailt chv maxv titch noclic ;
+   'SINON' ;      
+      TRCHPO mailt chv titch noclic ;
+   'FINSI' ;
+'FINSI' ;
+'SI' ('EGA' itcha 3) ;
+   'SI' echfix ;
+      TRCHPO mailt cht minmaxt titch noclic ;
+   'SINON' ;      
+      TRCHPO mailt cht titch noclic ;
+   'FINSI' ;
+'FINSI' ;
+* AJOUT DU ROTATIONNEL
+'SI' ('EGA' itcha 4) ;
+   'SI' echfix ;
+      TRCHPO mailt chr minmaxr titch noclic ;
+   'SINON' ;      
+      TRCHPO mailt chr titch noclic ;
+   'FINSI' ;
+'FINSI' ;
+* AJOUT DES FONCTIONS DE COURANT
+'SI' ('EGA' itcha 5) ;
+   'SI' echfix ;
+      TRCHPO mailt chc minmaxc titch noclic ;
+   'SINON' ;      
+      TRCHPO mailt chc titch noclic ;
+   'FINSI' ;
+'FINSI' ;
+* AJOUT DES TRAJECTOIRES
+'SI' ('EGA' itcha 6) ;
+     'TRACER' ('ET' cgeo chs) ;
+'FINSI' ;
+*
+*
+tem = matab.TIME.('EXTRAIRE' lindic ind) ;
+cha = 'CHAINE' 'Pas courant : ' ('EXTRAIRE' lindic ind) 
+        ' ; t=' (formar tem 3) ' s' ;
+*ret = 'MENU' cha 'global' (tcha . itcha)
+*   'options' 'n°' 'retracer' 'precedent' 'suivant' ;
+ret = 'MENU' cha 'global' (tcha . itcha)
+   'options' 'precedent' 'suivant' ;
+'SI' ('EGA' ret 'options') ; 'QUITTER' bouc1  ; 'FINSI';
+'SI' ('EGA' ret 'precedent') ; ind = ind - 1; 'FINSI';
+'SI' ('EGA' ret 'suivant')   ; ind = ind + 1; 'FINSI';
+*'SI' ('EGA' ret 'retracer')  ; ind = ind    ; 'FINSI';
+'SI' ('EGA' ret 'Quitter')   ; 'QUITTER' bouc2; 'FINSI';
+*'SI' ('EGA' ret 'n°') ; ind = 'SAIS' 'Numéro du pas : ' 'ENTIER';
+*           'FINSI';
+'SI' ('EGA' ret (tcha. itcha)) ; itcha = '+' itcha 1 ; 'FINSI' ;           
+'SI' ('EGA' ret 'global') ;
+   dessglob matab ;
+'FINSI';
+*
+'SI' (itcha > ntcha); itcha = 1      ; 'FINSI';
+'SI' (ind > ni); ind = 1      ; 'FINSI';
+'SI' (ind < 1);   ind = ni ; 'FINSI';
+*
+*
+'FIN' bouc1;
+'FIN' bouc2 ;
+'FINPRO';
+*
+* Fin de XPLORVPR

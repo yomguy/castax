@@ -1,0 +1,59 @@
+************************************************************************
+* NOM         : ISELECT
+* DESCRIPTION : génère une liste de ni entiers
+*               régulièrement espacés entre ideb et ifin
+*               inclus
+*
+* LANGAGE     : GIBIANE-CAST3M
+* AUTEUR      : Stéphane GOUNAND (CEA/DEN/DM2S/SFME/LTMF)
+*               mél : gounand@semt2.smts.cea.fr
+**********************************************************************
+* VERSION    : v1, 14/05/2004, version initiale
+* HISTORIQUE : v1, 14/05/2004, création
+* HISTORIQUE :
+* HISTORIQUE :
+************************************************************************
+* Prière de PRENDRE LE TEMPS de compléter les commentaires
+* en cas de modification de ce sous-programme afin de faciliter
+* la maintenance !
+************************************************************************
+*
+*
+'DEBPROC' ISELECT ;
+'ARGUMENT' ideb*'ENTIER  ' ;
+'ARGUMENT' ifin*'ENTIER  ' ;
+'ARGUMENT'   ni*'ENTIER  ' ;
+'ARGUMENT' imin/'ENTIER  ' ;
+'ARGUMENT' imax/'ENTIER  ' ;
+'SI' ('EXISTE' imin) ;
+   'SI' ('<' ideb imin) ;
+      cherr = 'CHAINE' 'ideb=' ideb ' < imin=' imin ;
+      'ERREUR' cherr ;
+   'FINSI' ;
+'FINSI' ;         
+'SI' ('EXISTE' imax) ;
+   'SI' ('>' ifin imax) ;
+      cherr = 'CHAINE' 'ifin=' ifin ' > imax=' imax ;
+      'ERREUR' cherr ;
+   'FINSI' ;
+'FINSI' ;
+*
+'SI' ('<' ni 2) ;
+   cherr = 'CHAINE' 'Erreur :'
+     ' ni=' ni ' < 2' ;
+   'ERREUR' cherr ;
+'FINSI' ;   
+*
+lisel = 'LECT' ;
+'REPETER' ii ni ;
+   pif = '/' ('FLOTTANT' ('-' &ii 1)) ('FLOTTANT' ('-' ni 1)) ;
+   pid = '-' 1.D0 pif ;
+   im = '+' ('*' pid ('FLOTTANT' ideb))
+            ('*' pif ('FLOTTANT' ifin)) ;
+   lisel = 'ET' lisel ('LECT' ('ENTIER' ('+' im 0.5D0))) ;
+'FIN' ii ;
+'RESPRO' lisel ;
+*
+* End of procedure file ISELECT
+*
+'FINPROC';
