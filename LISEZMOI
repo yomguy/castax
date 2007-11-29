@@ -29,7 +29,7 @@ Nicolas QUAEGEBEUR (ENSTA) <nicoq@aol.com>
 Pierre-Yves LAGRéE (UPMC/LMM) <pyl@ccr.jussieu.fr>
 Frederic DABBENE (CEA/SAC/DM2S/SFME/LTMF) <ttmf3@semt2.smts.cea.fr>
 
-Copyright (C) 2002-2005  Guillaume Pellerin <pellerin@ccr.jussieu.fr>
+Copyright (C) 2002-2007  Guillaume Pellerin <pellerin@ccr.jussieu.fr>
 
 
 LICENCE
@@ -242,8 +242,8 @@ $cheminbckp/$umax/$freq/$geo/....
 L'ensemble des scripts est bien sur modifiable pour appliquer les paramètres
 de son choix.
 
-VIDEOS
-======
+ANIMATIONS
+==========
 
 Par défaut, le script bin/pstompg_chpo.sh est exécuté par ./bin/castax à la fin
 du calcul pour créer des videos de l'évolution temporelle des résultats
